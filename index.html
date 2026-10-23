@@ -1,0 +1,558 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>BBC Director Dashboard</title>
+<style>
+:root{--bg:#f6f5f2;--panel:#fff;--ink:#1c1b19;--muted:#6b6862;--line:#e3e0d9;--accent:#b3261e;--accent-ink:#fff;--ok:#2e7d4f;--ok-bg:#e3f2e8;--warn:#9a6700;--warn-bg:#fbf0d0;--bad:#b3261e;--bad-bg:#fbe3e1;--idle:#8a867e;--idle-bg:#eceae5;--shadow:0 1px 2px rgba(0,0,0,.06)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#171614;--panel:#211f1d;--ink:#f0ede7;--muted:#a09b92;--line:#35322e;--accent:#e8574e;--accent-ink:#171614;--ok:#6cc18a;--ok-bg:#1d3326;--warn:#e0b04c;--warn-bg:#3a2f14;--bad:#f08a83;--bad-bg:#3e1f1c;--idle:#9a958c;--idle-bg:#2e2b28}}
+:root[data-theme="dark"]{--bg:#171614;--panel:#211f1d;--ink:#f0ede7;--muted:#a09b92;--line:#35322e;--accent:#e8574e;--accent-ink:#171614;--ok:#6cc18a;--ok-bg:#1d3326;--warn:#e0b04c;--warn-bg:#3a2f14;--bad:#f08a83;--bad-bg:#3e1f1c;--idle:#9a958c;--idle-bg:#2e2b28}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+.wrap{max-width:1100px;margin:0 auto;padding:0 16px 64px}
+header.top{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:16px 0 8px}
+.brand{font-weight:700;font-size:18px;letter-spacing:-.01em}
+.brand span{color:var(--accent)}
+.sync{margin-left:auto;font-size:12px;color:var(--muted)}
+.sync.bad{color:var(--bad);font-weight:600}
+nav.tabs{display:flex;gap:4px;overflow-x:auto;border-bottom:1px solid var(--line);margin-bottom:16px;-webkit-overflow-scrolling:touch}
+nav.tabs button{background:none;border:0;border-bottom:2px solid transparent;padding:10px 12px;font:inherit;color:var(--muted);cursor:pointer;white-space:nowrap}
+nav.tabs button[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--accent);font-weight:600}
+h2{font-size:17px;margin:0 0 10px}
+h3{font-size:14px;margin:0 0 8px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;font-weight:600}
+.grid{display:grid;gap:12px}
+.g4{grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}
+.g2{grid-template-columns:repeat(auto-fit,minmax(300px,1fr))}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px;box-shadow:var(--shadow)}
+.stat{font-size:28px;font-weight:700;line-height:1.1;font-variant-numeric:tabular-nums}
+.stat small{display:block;font-size:12px;font-weight:500;color:var(--muted);margin-top:4px}
+.stat.bad{color:var(--bad)}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.row.sp{justify-content:space-between}
+.muted{color:var(--muted)}
+.small{font-size:12px}
+button.btn,.btn{font:inherit;border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:8px;padding:7px 12px;cursor:pointer}
+button.btn:hover{border-color:var(--muted)}
+button.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:600}
+button.link{background:none;border:0;color:var(--accent);padding:0;font:inherit;cursor:pointer;text-decoration:underline}
+button.x{background:none;border:0;color:var(--muted);cursor:pointer;font-size:16px;padding:2px 6px}
+input,select,textarea{font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:7px 9px;max-width:100%}
+textarea{width:100%;min-height:70px;resize:vertical}
+input[type=checkbox]{width:18px;height:18px;accent-color:var(--accent)}
+input:focus,select:focus,textarea:focus,button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+label.f{display:block;font-size:12px;color:var(--muted);margin-bottom:10px}
+label.f>input,label.f>select,label.f>textarea{display:block;width:100%;margin-top:3px;font-size:15px}
+.badge{display:inline-block;padding:1px 8px;border-radius:999px;font-size:12px;font-weight:600;white-space:nowrap}
+.b-ok{background:var(--ok-bg);color:var(--ok)}
+.b-warn{background:var(--warn-bg);color:var(--warn)}
+.b-bad{background:var(--bad-bg);color:var(--bad)}
+.b-idle{background:var(--idle-bg);color:var(--idle)}
+.tw{overflow-x:auto;border:1px solid var(--line);border-radius:10px;background:var(--panel)}
+table{border-collapse:collapse;width:100%}
+th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--line);vertical-align:middle}
+th{font-size:12px;color:var(--muted);font-weight:600;white-space:nowrap}
+tr:last-child td{border-bottom:0}
+tr.click{cursor:pointer}
+tr.click:hover td{background:var(--bg)}
+.dots{display:flex;gap:4px}
+.dot{width:14px;height:14px;border-radius:4px;background:var(--idle-bg);border:1px solid var(--line)}
+.dot.done{background:var(--ok);border-color:var(--ok)}
+.dot.prog{background:var(--warn);border-color:var(--warn)}
+.dot.na{opacity:.35;background:transparent;border-style:dashed}
+.bar{height:6px;border-radius:3px;background:var(--idle-bg);overflow:hidden;min-width:60px}
+.bar>i{display:block;height:100%;background:var(--ok)}
+.task{display:flex;gap:10px;align-items:flex-start;padding:9px 0;border-bottom:1px solid var(--line)}
+.task:last-child{border-bottom:0}
+.task .t{flex:1;min-width:0}
+.task .t b{font-weight:500;overflow-wrap:anywhere}
+.task.done .t b{text-decoration:line-through;color:var(--muted)}
+.note{padding:10px 0;border-bottom:1px solid var(--line)}
+.note:last-child{border-bottom:0}
+.note p{margin:3px 0 0;white-space:pre-wrap;overflow-wrap:anywhere}
+.toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px}
+.toolbar .grow{flex:1}
+dialog{border:1px solid var(--line);border-radius:12px;background:var(--panel);color:var(--ink);padding:0;width:min(720px,calc(100vw - 24px));max-height:calc(100vh - 24px)}
+dialog::backdrop{background:rgba(0,0,0,.45)}
+.dlg{padding:16px;overflow-y:auto;max-height:calc(100vh - 28px)}
+.ms{display:grid;grid-template-columns:1fr 120px 140px;gap:8px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line)}
+.ms .mn{grid-column:1/-1}
+@media(min-width:620px){.ms{grid-template-columns:1fr 120px 140px 1.2fr}.ms .mn{grid-column:auto}}
+.gate{max-width:420px;margin:12vh auto;text-align:center}
+.gate input{width:100%;margin:12px 0}
+.empty{padding:18px;color:var(--muted);text-align:center}
+.cols2{display:grid;grid-template-columns:1fr 1fr;gap:0 12px}
+@media(max-width:560px){.cols2{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="wrap" id="app"></div>
+<script>
+"use strict";
+var ENDPOINT = "__ENDPOINT__";
+var KEY = null;
+try { KEY = localStorage.getItem("ddkey"); } catch (e) {}
+var S = {students: [], tasks: [], notes: [], config: {milestones: []}, report: {}};
+var UI = {tab: "overview", q: "", sf: "active", taskFilter: "open", noteStudent: "", sheetId: ""};
+var app = document.getElementById("app");
+
+/* ---------- helpers ---------- */
+function h(tag, attrs) {
+  var el = document.createElement(tag);
+  attrs = attrs || {};
+  for (var k in attrs) {
+    var v = attrs[k];
+    if (v == null || v === false) continue;
+    if (k === "text") el.textContent = v;
+    else if (k.slice(0, 2) === "on") el.addEventListener(k.slice(2), v);
+    else if (k === "value") el.value = v;
+    else if (v === true) el.setAttribute(k, "");
+    else el.setAttribute(k, v);
+  }
+  for (var i = 2; i < arguments.length; i++) add(el, arguments[i]);
+  return el;
+}
+function add(el, c) {
+  if (c == null || c === false) return;
+  if (Array.isArray(c)) c.forEach(function (x) { add(el, x); });
+  else el.appendChild(typeof c === "string" ? document.createTextNode(c) : c);
+}
+function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
+function todayStr() { var d = new Date(); return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); }
+function daysFrom(s) { if (!s) return null; var a = new Date(s + "T00:00:00"), b = new Date(todayStr() + "T00:00:00"); return Math.round((a - b) / 86400000); }
+function fmtDate(s) {
+  if (!s) return "";
+  var d = s.length <= 10 ? new Date(s + "T00:00:00") : new Date(s);
+  if (isNaN(d)) return s;
+  return d.toLocaleDateString(undefined, {month: "short", day: "numeric", year: d.getFullYear() === new Date().getFullYear() ? undefined : "numeric"});
+}
+function studentById(id) { return S.students.filter(function (s) { return s.id === id; })[0]; }
+function badge(text, kind) { return h("span", {class: "badge b-" + kind, text: text}); }
+function copy(text, msg) {
+  function ok() { setSync(msg || "Copied", false); setTimeout(function () { setSync("", false); }, 1800); }
+  if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(ok, function () { prompt("Copy:", text); });
+  else prompt("Copy:", text);
+}
+function msList() { return (S.config && S.config.milestones) || []; }
+function msState(st, k) { return ((st.ms || {})[k] || {}).s || "todo"; }
+function progress(st) {
+  var list = msList().filter(function (m) { return msState(st, m.k) !== "na"; });
+  if (!list.length) return 0;
+  return Math.round(100 * list.filter(function (m) { return msState(st, m.k) === "done"; }).length / list.length);
+}
+
+/* ---------- api / saving ---------- */
+var pending = 0, chain = {}, syncMsg = "", syncBad = false;
+function setSync(msg, bad) {
+  syncMsg = msg; syncBad = !!bad;
+  var el = document.getElementById("sync");
+  if (el) { el.textContent = msg; el.className = "sync" + (bad ? " bad" : ""); }
+}
+function call(action, data) {
+  var body = JSON.stringify(Object.assign({key: KEY, action: action}, data || {}));
+  return fetch(ENDPOINT, {method: "POST", headers: {"Content-Type": "text/plain;charset=utf-8"}, body: body}).then(function (r) { return r.json(); });
+}
+function persist(coll, obj, tries) {
+  tries = tries || 0;
+  return call("put", {coll: coll, obj: obj}).then(function (r) {
+    if (r && r.ok) return;
+    if (r && r.error === "auth") { signOut("That key no longer works."); return; }
+    throw new Error((r && r.error) || "fail");
+  }).catch(function () {
+    if (tries >= 4) { setSync("Could not save. Check connection, then reload.", true); return; }
+    setSync("Retrying save…", true);
+    return new Promise(function (res) { setTimeout(res, 3000); }).then(function () { return persist(coll, obj, tries + 1); });
+  });
+}
+function save(coll, obj) {
+  if (!obj.id) obj.id = uid();
+  var list = S[coll];
+  if (Array.isArray(list) && !list.some(function (x) { return x.id === obj.id; })) list.push(obj);
+  var key = coll + "|" + obj.id;
+  pending++; setSync("Saving…", false);
+  var snapshot = JSON.parse(JSON.stringify(obj));
+  chain[key] = (chain[key] || Promise.resolve()).then(function () { return persist(coll, snapshot); }).then(function () {
+    pending--; if (!pending) { setSync("Saved", false); setTimeout(function () { if (!pending) setSync("", false); }, 1500); }
+  });
+  return obj;
+}
+function saveConfig() { S.config.id = "main"; save("config", S.config); }
+function remove(coll, id) {
+  S[coll] = S[coll].filter(function (x) { return x.id !== id; });
+  pending++; setSync("Saving…", false);
+  var key = coll + "|" + id;
+  chain[key] = (chain[key] || Promise.resolve()).then(function () { return call("del", {coll: coll, id: id}); }).then(function () {
+    pending--; if (!pending) { setSync("Saved", false); setTimeout(function () { if (!pending) setSync("", false); }, 1500); }
+  }).catch(function () { pending--; setSync("Delete may not have saved. Reload to check.", true); });
+}
+var timers = {};
+function saveSoon(coll, obj) {
+  var k = coll + "|" + obj.id;
+  clearTimeout(timers[k]);
+  setSync("Editing…", false);
+  timers[k] = setTimeout(function () { save(coll, obj); }, 700);
+}
+
+/* ---------- boot ---------- */
+function signOut(msg) { try { localStorage.removeItem("ddkey"); } catch (e) {} KEY = null; gate(msg); }
+function gate(msg) {
+  app.textContent = "";
+  var inp = h("input", {type: "password", placeholder: "Director key", autocomplete: "off", "aria-label": "Director key"});
+  function go() { var v = inp.value.trim(); if (!v) return; KEY = v; try { localStorage.setItem("ddkey", v); } catch (e) {} boot(); }
+  inp.addEventListener("keydown", function (e) { if (e.key === "Enter") go(); });
+  app.appendChild(h("div", {class: "gate card"},
+    h("div", {class: "brand"}, "BBC ", h("span", {text: "Director"}), " Dashboard"),
+    h("p", {class: "muted", text: msg || "Enter your director key to open the dashboard."}), inp,
+    h("button", {class: "btn primary", onclick: go, text: "Open"})));
+  inp.focus();
+}
+function boot() {
+  var m = location.hash.slice(1);
+  if (m) { KEY = m; try { localStorage.setItem("ddkey", m); } catch (e) {} history.replaceState(null, "", location.pathname + location.search); }
+  if (!KEY) return gate();
+  app.textContent = "";
+  app.appendChild(h("p", {class: "muted", style: "padding:40px 0;text-align:center", text: "Loading…"}));
+  loadAll(true);
+}
+function loadAll(first) {
+  return call("load").then(function (r) {
+    if (!r || !r.ok) {
+      if (r && r.error === "auth") return signOut("That key didn't work. Paste it again.");
+      throw new Error("load");
+    }
+    S.students = r.data.students; S.tasks = r.data.tasks; S.notes = r.data.notes;
+    S.config = r.data.config || {milestones: []}; S.report = r.report || {}; UI.sheetId = r.sheetId || "";
+    S.students.sort(function (a, b) { return a.name.localeCompare(b.name); });
+    render();
+  }).catch(function () {
+    if (!first) { setSync("Could not refresh.", true); return; }
+    app.textContent = "";
+    app.appendChild(h("div", {class: "gate card"}, h("p", {text: "Couldn't reach the server."}), h("button", {class: "btn primary", onclick: boot, text: "Try again"})));
+  });
+}
+
+/* ---------- shell ---------- */
+var TABS = [["overview", "Overview"], ["tasks", "Tasks"], ["students", "Students"], ["notes", "Notes"], ["report", "Annual report"], ["settings", "Settings"]];
+function render() {
+  var openDlg = document.querySelector("dialog[open]");
+  if (openDlg) return; // don't clobber an open editor
+  app.textContent = "";
+  app.appendChild(h("header", {class: "top"},
+    h("div", {class: "brand"}, "BBC ", h("span", {text: "Director"}), " Dashboard"),
+    h("div", {id: "sync", class: "sync" + (syncBad ? " bad" : ""), text: syncMsg})));
+  var nav = h("nav", {class: "tabs", role: "tablist"});
+  TABS.forEach(function (t) {
+    nav.appendChild(h("button", {role: "tab", "aria-selected": String(UI.tab === t[0]), text: t[1], onclick: function () { UI.tab = t[0]; render(); }}));
+  });
+  app.appendChild(nav);
+  var view = {overview: vOverview, tasks: vTasks, students: vStudents, notes: vNotes, report: vReport, settings: vSettings}[UI.tab];
+  app.appendChild(view());
+}
+
+/* ---------- overview ---------- */
+function openTasks() { return S.tasks.filter(function (t) { return t.status !== "done"; }); }
+function reportCounts() {
+  var act = S.students.filter(function (s) { return s.status === "active"; }), c = {n: 0, sSub: 0, aSub: 0, sDraft: 0};
+  act.forEach(function (s) { var r = S.report[s.id]; if (!r) return; c.n++; if (r.sSub) c.sSub++; else if (r.sDraft) c.sDraft++; if (r.aSub) c.aSub++; });
+  return c;
+}
+function vOverview() {
+  var ot = openTasks(), overdue = ot.filter(function (t) { var d = daysFrom(t.due); return d != null && d < 0; });
+  var soon = ot.filter(function (t) { var d = daysFrom(t.due); return d != null && d >= 0 && d <= 14; });
+  var rc = reportCounts(), flagged = S.students.filter(function (s) { return s.flag && s.status === "active"; });
+  var act = S.students.filter(function (s) { return s.status === "active"; });
+  var avg = act.length ? Math.round(act.reduce(function (a, s) { return a + progress(s); }, 0) / act.length) : 0;
+  var root = h("div", {class: "grid"});
+  root.appendChild(h("div", {class: "grid g4"},
+    h("div", {class: "card stat" + (overdue.length ? " bad" : ""), text: String(overdue.length)}, h("small", {text: "Overdue tasks"})),
+    h("div", {class: "card stat", text: String(soon.length)}, h("small", {text: "Due in 14 days"})),
+    h("div", {class: "card stat", text: String(act.length)}, h("small", {text: "Active students"})),
+    h("div", {class: "card stat", text: avg + "%"}, h("small", {text: "Avg milestone progress"})),
+    h("div", {class: "card stat", text: rc.sSub + "/" + rc.n}, h("small", {text: "Student reports in"})),
+    h("div", {class: "card stat", text: rc.aSub + "/" + rc.n}, h("small", {text: "Advisor reviews in"}))));
+  var left = h("div", {class: "card"}, h("h3", {text: "Needs attention"}));
+  var items = overdue.concat(soon);
+  if (!items.length) left.appendChild(h("div", {class: "empty", text: "No overdue or upcoming tasks."}));
+  items.slice(0, 8).forEach(function (t) { left.appendChild(taskRow(t, true)); });
+  if (flagged.length) {
+    left.appendChild(h("h3", {text: "Flagged students", style: "margin-top:14px"}));
+    flagged.forEach(function (s) { left.appendChild(h("div", {class: "row", style: "padding:4px 0"}, h("button", {class: "link", text: s.name, onclick: function () { studentDlg(s); }}), h("span", {class: "muted small", text: s.advisor}))); });
+  }
+  var right = h("div", {class: "card"}, h("h3", {text: "Recent notes"}));
+  var rn = S.notes.slice().sort(function (a, b) { return (b.date || "").localeCompare(a.date || "") || (b.created || "").localeCompare(a.created || ""); }).slice(0, 6);
+  if (!rn.length) right.appendChild(h("div", {class: "empty", text: "No notes yet."}));
+  rn.forEach(function (n) { right.appendChild(noteRow(n)); });
+  root.appendChild(h("div", {class: "grid g2"}, left, right));
+  return root;
+}
+
+/* ---------- tasks ---------- */
+var CATS = ["Admissions", "Annual report", "Curriculum", "Funding", "Meetings", "Reporting", "Students", "Other"];
+function taskRow(t, showStudent) {
+  var d = daysFrom(t.due), st = t.status === "done";
+  var due = t.due ? (st ? badge(fmtDate(t.due), "idle") : badge(d < 0 ? "Overdue " + fmtDate(t.due) : fmtDate(t.due), d < 0 ? "bad" : d <= 7 ? "warn" : "idle")) : null;
+  var stu = t.studentId && studentById(t.studentId);
+  return h("div", {class: "task" + (st ? " done" : "")},
+    h("input", {type: "checkbox", checked: st, "aria-label": "Done", onchange: function (e) { t.status = e.target.checked ? "done" : "open"; t.doneAt = e.target.checked ? todayStr() : ""; save("tasks", t); render(); }}),
+    h("div", {class: "t"}, h("b", {text: t.title}),
+      h("div", {class: "small muted"}, [t.cat, stu && showStudent !== false ? stu.name : null, t.notes].filter(Boolean).join(" · "))),
+    due, h("button", {class: "x", "aria-label": "Edit task", text: "✎", onclick: function () { taskDlg(t); }}));
+}
+function vTasks() {
+  var root = h("div", {});
+  var sel = h("select", {onchange: function (e) { UI.taskFilter = e.target.value; render(); }},
+    [["open", "Open"], ["done", "Done"], ["all", "All"]].map(function (o) { return h("option", {value: o[0], text: o[1], selected: UI.taskFilter === o[0]}); }));
+  root.appendChild(h("div", {class: "toolbar"}, sel, h("span", {class: "grow"}), h("button", {class: "btn primary", text: "+ New task", onclick: function () { taskDlg(null); }})));
+  var list = S.tasks.filter(function (t) { return UI.taskFilter === "all" || (UI.taskFilter === "done") === (t.status === "done"); });
+  list.sort(function (a, b) { return (a.due || "9999").localeCompare(b.due || "9999"); });
+  var card = h("div", {class: "card"});
+  if (!list.length) card.appendChild(h("div", {class: "empty", text: "Nothing here."}));
+  list.forEach(function (t) { card.appendChild(taskRow(t)); });
+  root.appendChild(card);
+  return root;
+}
+function dialog(build) {
+  var dlg = h("dialog", {});
+  var inner = h("div", {class: "dlg"});
+  dlg.appendChild(inner);
+  function close() { dlg.close(); }
+  build(inner, close);
+  dlg.addEventListener("close", function () { dlg.remove(); render(); });
+  dlg.addEventListener("click", function (e) { if (e.target === dlg) dlg.close(); });
+  document.body.appendChild(dlg);
+  dlg.showModal();
+  return dlg;
+}
+function taskDlg(t, preset) {
+  var isNew = !t; t = t || preset || {status: "open", cat: "Other", due: "", title: "", studentId: "", notes: ""};
+  dialog(function (el, close) {
+    var title = h("input", {value: t.title, placeholder: "What needs doing?"});
+    var due = h("input", {type: "date", value: t.due});
+    var cat = h("select", {}, CATS.map(function (c) { return h("option", {value: c, text: c, selected: t.cat === c}); }));
+    var stu = h("select", {}, [h("option", {value: "", text: "None"})].concat(S.students.map(function (s) { return h("option", {value: s.id, text: s.name, selected: t.studentId === s.id}); })));
+    var notes = h("textarea", {value: t.notes || ""});
+    el.appendChild(h("h2", {text: isNew ? "New task" : "Edit task"}));
+    el.appendChild(h("label", {class: "f"}, "Task", title));
+    el.appendChild(h("div", {class: "cols2"}, h("label", {class: "f"}, "Due", due), h("label", {class: "f"}, "Category", cat)));
+    el.appendChild(h("label", {class: "f"}, "Student (optional)", stu));
+    el.appendChild(h("label", {class: "f"}, "Notes", notes));
+    el.appendChild(h("div", {class: "row sp"},
+      isNew ? h("span") : h("button", {class: "btn", text: "Delete", onclick: function () { if (confirm("Delete this task?")) { remove("tasks", t.id); close(); } }}),
+      h("div", {class: "row"}, h("button", {class: "btn", text: "Cancel", onclick: close}),
+        h("button", {class: "btn primary", text: "Save", onclick: function () {
+          if (!title.value.trim()) { title.focus(); return; }
+          t.title = title.value.trim(); t.due = due.value; t.cat = cat.value; t.studentId = stu.value; t.notes = notes.value.trim();
+          save("tasks", t); close();
+        }}))));
+    title.focus();
+  });
+}
+
+/* ---------- students ---------- */
+function vStudents() {
+  var root = h("div", {});
+  var q = h("input", {type: "search", placeholder: "Search students or advisors", value: UI.q, "aria-label": "Search", oninput: function (e) { UI.q = e.target.value; drawRows(); }});
+  var sf = h("select", {onchange: function (e) { UI.sf = e.target.value; render(); }},
+    [["active", "Active"], ["leave", "On leave"], ["graduated", "Graduated"], ["all", "All"]].map(function (o) { return h("option", {value: o[0], text: o[1], selected: UI.sf === o[0]}); }));
+  root.appendChild(h("div", {class: "toolbar"}, q, sf, h("span", {class: "grow"}), h("button", {class: "btn primary", text: "+ Add student", onclick: function () { studentDlg(null); }})));
+  var ms = msList();
+  var thead = h("tr", {}, h("th", {text: "Student"}), h("th", {text: "Advisor"}), h("th", {text: "Milestones"}), h("th", {text: "Progress"}), h("th", {text: "Last meeting"}));
+  var tbody = h("tbody", {});
+  root.appendChild(h("div", {class: "tw"}, h("table", {}, h("thead", {}, thead), tbody)));
+  function drawRows() {
+    tbody.textContent = "";
+    var needle = UI.q.toLowerCase();
+    var list = S.students.filter(function (s) {
+      return (UI.sf === "all" || s.status === UI.sf) && (!needle || (s.name + " " + s.advisor).toLowerCase().indexOf(needle) >= 0);
+    });
+    if (!list.length) tbody.appendChild(h("tr", {}, h("td", {colspan: "5", class: "empty", text: "No students match."})));
+    list.forEach(function (s) {
+      var p = progress(s);
+      tbody.appendChild(h("tr", {class: "click", tabindex: "0", onclick: function () { studentDlg(s); }, onkeydown: function (e) { if (e.key === "Enter") studentDlg(s); }},
+        h("td", {}, h("b", {text: s.name}), s.flag ? " " : "", s.flag ? badge("Flag", "bad") : "", s.cohort ? h("div", {class: "small muted", text: "Cohort " + s.cohort}) : ""),
+        h("td", {text: s.advisor}),
+        h("td", {}, h("div", {class: "dots", title: ms.map(function (m) { return m.label + ": " + msState(s, m.k); }).join("\n")}, ms.map(function (m) { return h("span", {class: "dot " + msState(s, m.k)}); }))),
+        h("td", {}, h("div", {class: "row"}, h("div", {class: "bar", style: "width:70px"}, h("i", {style: "width:" + p + "%"})), h("span", {class: "small", text: p + "%"}))),
+        h("td", {class: "small muted", text: s.lastMeeting ? fmtDate(s.lastMeeting) : "—"})));
+    });
+  }
+  drawRows();
+  root.appendChild(h("p", {class: "small muted", text: "Dot legend: green = done, amber = in progress, grey = not started, dashed = not applicable. Hover for names."}));
+  return root;
+}
+var MS_OPTS = [["todo", "Not started"], ["prog", "In progress"], ["done", "Done"], ["na", "N/A"]];
+function studentDlg(s) {
+  var isNew = !s;
+  s = s || {name: "", advisor: "", email: "", advisorEmail: "", cohort: "", status: "active", flag: false, funding: "", lastMeeting: "", summary: "", ms: {}};
+  dialog(function (el, close) {
+    function fld(label, key, type) {
+      var inp = h("input", {type: type || "text", value: s[key] || "", oninput: function (e) { s[key] = e.target.value; if (!isNew) saveSoon("students", s); }});
+      return h("label", {class: "f"}, label, inp);
+    }
+    el.appendChild(h("div", {class: "row sp"}, h("h2", {text: isNew ? "Add student" : s.name}), h("button", {class: "btn", text: "Close", onclick: close})));
+    if (isNew) el.appendChild(fld("Name", "name"));
+    el.appendChild(h("div", {class: "cols2"}, fld("Advisor", "advisor"), fld("Cohort (entry year)", "cohort")));
+    el.appendChild(h("div", {class: "cols2"}, fld("Student email", "email", "email"), fld("Advisor email", "advisorEmail", "email")));
+    var status = h("select", {onchange: function (e) { s.status = e.target.value; if (!isNew) save("students", s); }},
+      [["active", "Active"], ["leave", "On leave"], ["graduated", "Graduated"]].map(function (o) { return h("option", {value: o[0], text: o[1], selected: s.status === o[0]}); }));
+    el.appendChild(h("div", {class: "cols2"}, h("label", {class: "f"}, "Status", status), fld("Last meeting", "lastMeeting", "date")));
+    el.appendChild(fld("Funding (source, end date)", "funding"));
+    el.appendChild(h("label", {class: "row small muted", style: "margin-bottom:10px"}, h("input", {type: "checkbox", checked: !!s.flag, onchange: function (e) { s.flag = e.target.checked; if (!isNew) save("students", s); }}), "Flag for attention"));
+    var sum = h("textarea", {value: s.summary || "", placeholder: "Standing summary: where they are, concerns, next steps", oninput: function (e) { s.summary = e.target.value; if (!isNew) saveSoon("students", s); }});
+    el.appendChild(h("label", {class: "f"}, "Summary", sum));
+    if (isNew) {
+      el.appendChild(h("div", {class: "row"}, h("button", {class: "btn primary", text: "Add", onclick: function () {
+        if (!s.name.trim()) return; s.name = s.name.trim(); s.id = uid(); save("students", s);
+        S.students.sort(function (a, b) { return a.name.localeCompare(b.name); }); close();
+      }})));
+      return;
+    }
+    var r = S.report[s.id];
+    if (r) el.appendChild(h("div", {class: "row small", style: "margin-bottom:10px"}, h("span", {class: "muted", text: "Annual report:"}), repBadge(r.sSub, r.sDraft, "Student"), repBadge(r.aSub, r.aDraft, "Advisor")));
+    el.appendChild(h("h3", {text: "Milestones", style: "margin-top:6px"}));
+    msList().forEach(function (m) {
+      var cur = (s.ms || (s.ms = {}))[m.k] || (s.ms[m.k] = {s: "todo", date: "", note: ""});
+      function upd() { saveSoon("students", s); }
+      var dateI = h("input", {type: "date", value: cur.date || "", "aria-label": m.label + " date", oninput: function (e) { cur.date = e.target.value; upd(); }});
+      el.appendChild(h("div", {class: "ms"}, h("b", {text: m.label}),
+        h("select", {"aria-label": m.label + " status", onchange: function (e) { cur.s = e.target.value; if (cur.s === "done" && !cur.date) { cur.date = todayStr(); dateI.value = cur.date; } upd(); }},
+          MS_OPTS.map(function (o) { return h("option", {value: o[0], text: o[1], selected: cur.s === o[0]}); })),
+        dateI,
+        h("input", {class: "mn", placeholder: "Note", value: cur.note || "", oninput: function (e) { cur.note = e.target.value; upd(); }})));
+    });
+    var notesBox = h("div", {});
+    var tasksBox = h("div", {});
+    function drawNotes() {
+      notesBox.textContent = "";
+      S.notes.filter(function (n) { return n.studentId === s.id; }).sort(function (a, b) { return (b.date || "").localeCompare(a.date || ""); })
+        .forEach(function (n) { notesBox.appendChild(noteRow(n, drawNotes)); });
+      if (!notesBox.firstChild) notesBox.appendChild(h("div", {class: "small muted", style: "padding:6px 0", text: "No notes yet."}));
+    }
+    function drawTasks() {
+      tasksBox.textContent = "";
+      S.tasks.filter(function (t) { return t.studentId === s.id && t.status !== "done"; }).forEach(function (t) { tasksBox.appendChild(h("div", {class: "small", style: "padding:3px 0", text: (t.due ? fmtDate(t.due) + " · " : "") + t.title})); });
+      if (!tasksBox.firstChild) tasksBox.appendChild(h("div", {class: "small muted", text: "No open tasks for this student."}));
+    }
+    el.appendChild(h("h3", {text: "Notes", style: "margin-top:16px"}));
+    var nt = h("textarea", {placeholder: "Log a meeting, conversation, or concern"});
+    el.appendChild(nt);
+    el.appendChild(h("div", {class: "row", style: "margin:6px 0"}, h("button", {class: "btn", text: "Add note", onclick: function () {
+      if (!nt.value.trim()) return; save("notes", {studentId: s.id, text: nt.value.trim(), date: todayStr(), tag: "Meeting", created: new Date().toISOString()}); nt.value = ""; drawNotes();
+    }})));
+    el.appendChild(notesBox); drawNotes();
+    el.appendChild(h("h3", {text: "Open tasks", style: "margin-top:16px"}));
+    el.appendChild(tasksBox); drawTasks();
+    el.appendChild(h("div", {class: "row", style: "margin-top:8px"}, h("button", {class: "btn", text: "+ Task for " + s.name.split(" ")[0], onclick: function () {
+      close(); taskDlg(null, {status: "open", cat: "Students", due: "", title: "", studentId: s.id, notes: ""});
+    }})));
+    el.appendChild(h("div", {class: "row", style: "margin-top:18px"}, h("button", {class: "btn", text: "Remove student", onclick: function () {
+      if (confirm("Remove " + s.name + " from the dashboard? Their notes stay in the log. Consider setting status to Graduated instead.")) { remove("students", s.id); close(); }
+    }})));
+  });
+}
+function repBadge(sub, draft, who) {
+  if (sub) return badge(who + ": submitted " + fmtDate(sub), "ok");
+  if (draft) return badge(who + ": draft", "warn");
+  return badge(who + ": not started", "idle");
+}
+
+/* ---------- notes ---------- */
+var TAGS = ["Meeting", "Concern", "Milestone", "Funding", "Admin", "Other"];
+function noteRow(n, redraw) {
+  var s = n.studentId && studentById(n.studentId);
+  return h("div", {class: "note"},
+    h("div", {class: "row sp small muted"}, h("span", {text: [fmtDate(n.date), n.tag, s ? s.name : "General"].filter(Boolean).join(" · ")}),
+      h("button", {class: "x", "aria-label": "Delete note", text: "×", onclick: function () { if (confirm("Delete this note?")) { remove("notes", n.id); if (redraw) redraw(); else render(); } }})),
+    h("p", {text: n.text}));
+}
+function vNotes() {
+  var root = h("div", {});
+  var stuSel = h("select", {onchange: function (e) { UI.noteStudent = e.target.value; render(); }},
+    [h("option", {value: "", text: "All students and general"})].concat(S.students.map(function (s) { return h("option", {value: s.id, text: s.name, selected: UI.noteStudent === s.id}); })));
+  var form = h("div", {class: "card", style: "margin-bottom:12px"});
+  var txt = h("textarea", {placeholder: "New note (meeting, decision, reminder for the file)"});
+  var tag = h("select", {}, TAGS.map(function (t) { return h("option", {value: t, text: t}); }));
+  var who = h("select", {}, [h("option", {value: "", text: "General"})].concat(S.students.map(function (s) { return h("option", {value: s.id, text: s.name, selected: UI.noteStudent === s.id}); })));
+  form.appendChild(txt);
+  form.appendChild(h("div", {class: "row", style: "margin-top:8px"}, who, tag, h("button", {class: "btn primary", text: "Add note", onclick: function () {
+    if (!txt.value.trim()) return;
+    save("notes", {studentId: who.value, text: txt.value.trim(), date: todayStr(), tag: tag.value, created: new Date().toISOString()}); render();
+  }})));
+  root.appendChild(form);
+  root.appendChild(h("div", {class: "toolbar"}, stuSel));
+  var list = S.notes.filter(function (n) { return !UI.noteStudent || n.studentId === UI.noteStudent; })
+    .sort(function (a, b) { return (b.date || "").localeCompare(a.date || "") || (b.created || "").localeCompare(a.created || ""); });
+  var card = h("div", {class: "card"});
+  if (!list.length) card.appendChild(h("div", {class: "empty", text: "No notes."}));
+  list.forEach(function (n) { card.appendChild(noteRow(n)); });
+  root.appendChild(card);
+  return root;
+}
+
+/* ---------- annual report ---------- */
+function vReport() {
+  var root = h("div", {});
+  var rc = reportCounts();
+  root.appendChild(h("div", {class: "grid g4", style: "margin-bottom:12px"},
+    h("div", {class: "card stat", text: rc.sSub + "/" + rc.n}, h("small", {text: "Students submitted"})),
+    h("div", {class: "card stat", text: String(rc.sDraft)}, h("small", {text: "Students with a draft"})),
+    h("div", {class: "card stat", text: rc.aSub + "/" + rc.n}, h("small", {text: "Advisor reviews submitted"}))));
+  var act = S.students.filter(function (s) { return s.status === "active" && S.report[s.id]; });
+  var pendS = act.filter(function (s) { return !S.report[s.id].sSub && s.email; });
+  var pendA = act.filter(function (s) { return !S.report[s.id].aSub && s.advisorEmail; });
+  var advEmails = Array.from(new Set(pendA.map(function (s) { return s.advisorEmail; })));
+  root.appendChild(h("div", {class: "toolbar"},
+    h("button", {class: "btn", text: "Refresh", onclick: function () { setSync("Refreshing…", false); call("report").then(function (r) { if (r && r.ok) { S.report = r.report; setSync("Updated", false); render(); } else setSync("Could not refresh.", true); }).catch(function () { setSync("Could not refresh.", true); }); }}),
+    h("button", {class: "btn", text: "Copy emails: students pending (" + pendS.length + ")", onclick: function () { copy(pendS.map(function (s) { return s.email; }).join(", "), "Copied student emails"); }}),
+    h("button", {class: "btn", text: "Copy emails: advisors pending (" + advEmails.length + ")", onclick: function () { copy(advEmails.join(", "), "Copied advisor emails"); }}),
+    UI.sheetId ? h("span", {class: "small muted", text: "Responses live in the BBC Progress Reports sheet."}) : null));
+  var tb = h("tbody", {});
+  act.forEach(function (s) {
+    var r = S.report[s.id];
+    tb.appendChild(h("tr", {}, h("td", {}, h("button", {class: "link", text: s.name, onclick: function () { studentDlg(s); }})), h("td", {text: s.advisor}),
+      h("td", {}, repBadge(r.sSub, r.sDraft, "")), h("td", {}, repBadge(r.aSub, r.aDraft, ""))));
+  });
+  if (!act.length) tb.appendChild(h("tr", {}, h("td", {colspan: "4", class: "empty", text: "No report data yet."})));
+  root.appendChild(h("div", {class: "tw"}, h("table", {}, h("thead", {}, h("tr", {}, h("th", {text: "Student"}), h("th", {text: "Advisor"}), h("th", {text: "Student section"}), h("th", {text: "Advisor review"}))), tb)));
+  return root;
+}
+
+/* ---------- settings ---------- */
+function vSettings() {
+  var root = h("div", {class: "grid"});
+  var card = h("div", {class: "card"}, h("h3", {text: "Milestone template"}),
+    h("p", {class: "small muted", text: "These columns appear for every student. Rename or reorder freely; removing one hides it but keeps stored dates."}));
+  var box = h("div", {});
+  function draw() {
+    box.textContent = "";
+    msList().forEach(function (m, i) {
+      box.appendChild(h("div", {class: "row", style: "margin-bottom:6px"},
+        h("input", {value: m.label, style: "flex:1;min-width:160px", "aria-label": "Milestone name", oninput: function (e) { m.label = e.target.value; saveConfigSoon(); }}),
+        h("button", {class: "btn", text: "↑", "aria-label": "Move up", onclick: function () { if (i > 0) { var l = S.config.milestones; l.splice(i - 1, 0, l.splice(i, 1)[0]); saveConfig(); draw(); } }}),
+        h("button", {class: "btn", text: "↓", "aria-label": "Move down", onclick: function () { var l = S.config.milestones; if (i < l.length - 1) { l.splice(i + 1, 0, l.splice(i, 1)[0]); saveConfig(); draw(); } }}),
+        h("button", {class: "btn", text: "Remove", onclick: function () { if (confirm("Remove this milestone column?")) { S.config.milestones.splice(i, 1); saveConfig(); draw(); } }})));
+    });
+  }
+  var cfgTimer;
+  function saveConfigSoon() { clearTimeout(cfgTimer); setSync("Editing…", false); cfgTimer = setTimeout(saveConfig, 700); }
+  draw();
+  card.appendChild(box);
+  card.appendChild(h("button", {class: "btn", text: "+ Add milestone", onclick: function () { S.config.milestones.push({k: "m" + uid(), label: "New milestone"}); saveConfig(); draw(); }}));
+  root.appendChild(card);
+  root.appendChild(h("div", {class: "card"}, h("h3", {text: "Backup and access"}),
+    h("div", {class: "row"},
+      h("button", {class: "btn", text: "Download backup (JSON)", onclick: function () {
+        var blob = new Blob([JSON.stringify({exported: new Date().toISOString(), students: S.students, tasks: S.tasks, notes: S.notes, config: S.config}, null, 1)], {type: "application/json"});
+        var a = h("a", {href: URL.createObjectURL(blob), download: "bbc-director-backup-" + todayStr() + ".json"}); document.body.appendChild(a); a.click(); a.remove();
+      }}),
+      h("button", {class: "btn", text: "Sign out on this device", onclick: function () { signOut("Signed out."); }})),
+    h("p", {class: "small muted", text: "Data is stored in a private Google Sheet owned by your BU account (\"BBC Director Dashboard (data)\"). This page holds no student data; it is unlocked by your key."})));
+  return root;
+}
+
+boot();
+</script>
+</body>
+</html>
