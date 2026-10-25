@@ -85,6 +85,17 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
 .empty{padding:18px;color:var(--muted);text-align:center}
 .cols2{display:grid;grid-template-columns:1fr 1fr;gap:0 12px}
 @media(max-width:560px){.cols2{grid-template-columns:1fr}}
+.stack{display:flex;height:14px;border-radius:4px;overflow:hidden;background:var(--idle-bg);min-width:140px}
+.stack i{display:block;height:100%}
+.stack .s-t{background:var(--ok)}.stack .s-a{background:var(--warn)}.stack .s-n{background:var(--bad)}
+.rate{display:inline-block;min-width:22px;text-align:center;padding:1px 6px;border-radius:6px;font-weight:700;font-size:12px}
+.rate.r3,.rate.r4{background:var(--ok-bg);color:var(--ok)}.rate.r2{background:var(--warn-bg);color:var(--warn)}.rate.r1{background:var(--bad-bg);color:var(--bad)}.rate.r0{background:var(--idle-bg);color:var(--idle)}
+.qa{margin:0 0 12px}.qa .q{font-size:12px;color:var(--muted);margin-bottom:2px}.qa .a{white-space:pre-wrap;overflow-wrap:anywhere}
+.qa .a.none{color:var(--muted);font-style:italic}
+.sec{border-top:1px solid var(--line);padding-top:12px;margin-top:14px}
+.sec h3{margin-top:0}
+.legend{display:flex;gap:12px;flex-wrap:wrap;font-size:12px;color:var(--muted);align-items:center}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:4px;vertical-align:-1px}
 </style>
 </head>
 <body>
@@ -94,7 +105,7 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
 var ENDPOINT = "https://script.google.com/macros/s/AKfycbzEvyhVxuqA9G0w4c9gyUHHB9JDqtDa3fqZFyhNc6G5taf9oS3BWKQzsQPXj0qCFhIN/exec";
 var KEY = null;
 try { KEY = localStorage.getItem("ddkey"); } catch (e) {}
-var S = {students: [], tasks: [], notes: [], config: {milestones: []}, report: {}};
+var S = {students: [], tasks: [], notes: [], config: {milestones: []}, report: {}, reviews: null};
 var UI = {tab: "overview", q: "", sf: "active", taskFilter: "open", noteStudent: "", sheetId: ""};
 var app = document.getElementById("app");
 
@@ -119,6 +130,7 @@ function add(el, c) {
   if (Array.isArray(c)) c.forEach(function (x) { add(el, x); });
   else el.appendChild(typeof c === "string" ? document.createTextNode(c) : c);
 }
+function isFilled(v) { return v != null && String(v).trim() !== ""; }
 function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
 function todayStr() { var d = new Date(); return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); }
 function daysFrom(s) { if (!s) return null; var a = new Date(s + "T00:00:00"), b = new Date(todayStr() + "T00:00:00"); return Math.round((a - b) / 86400000); }
@@ -234,7 +246,7 @@ function loadAll(first) {
 }
 
 /* ---------- shell ---------- */
-var TABS = [["overview", "Overview"], ["tasks", "Tasks"], ["students", "Students"], ["notes", "Notes"], ["report", "Annual report"], ["settings", "Settings"]];
+var TABS = [["overview", "Overview"], ["tasks", "Tasks"], ["students", "Students"], ["notes", "Notes"], ["report", "Annual report"], ["reviews", "Reviews 25/26"], ["settings", "Settings"]];
 function render() {
   var openDlg = document.querySelector("dialog[open]");
   if (openDlg) return; // don't clobber an open editor
@@ -247,7 +259,7 @@ function render() {
     nav.appendChild(h("button", {role: "tab", "aria-selected": String(UI.tab === t[0]), text: t[1], onclick: function () { UI.tab = t[0]; render(); }}));
   });
   app.appendChild(nav);
-  var view = {overview: vOverview, tasks: vTasks, students: vStudents, notes: vNotes, report: vReport, settings: vSettings}[UI.tab];
+  var view = {overview: vOverview, tasks: vTasks, students: vStudents, notes: vNotes, report: vReport, reviews: vReviews, settings: vSettings}[UI.tab];
   app.appendChild(view());
 }
 
@@ -517,6 +529,194 @@ function vReport() {
   if (!act.length) tb.appendChild(h("tr", {}, h("td", {colspan: "4", class: "empty", text: "No report data yet."})));
   root.appendChild(h("div", {class: "tw"}, h("table", {}, h("thead", {}, h("tr", {}, h("th", {text: "Student"}), h("th", {text: "Advisor"}), h("th", {text: "Student section"}), h("th", {text: "Advisor review"}))), tb)));
   return root;
+}
+
+/* ---------- reviews 25/26 ---------- */
+var REV_STUDENT = [
+  ["Mastery of existing theory and research", [["g1_stage", "Current stage and milestones completed"], ["g1_summary", "How did you build your command of the literature?"]]],
+  ["Independent, ethical research", [["g2_pubs", "Publications and manuscripts", "list"], ["g2_talks", "Talks and posters", "list"], ["g2_funding", "Fellowships, grants and awards"], ["g2_summary", "Research progress and independent contributions"]]],
+  ["Professional and ethical scholarly activity", [["g3_ethics", "Ethics and responsible conduct of research training"], ["g3_service", "Service, mentoring and community contributions"]]],
+  ["Teaching", [["g4_courses", "Courses taught", "list"], ["g4_reflection", "Teaching experience and development"]]],
+  ["Looking ahead", [["plan_goals", "Goals for the coming year (2026-2027)"], ["plan_support", "Support needed from advisor or program"]]]
+];
+var REV_GOALS = [[1, "Goal 1: Mastery of theory and research"], [2, "Goal 2: Independent, ethical research"], [3, "Goal 3: Professional and ethical activity"], [4, "Goal 4: Teaching (director score)"]];
+var revState = {loading: false, error: ""};
+function loadReviews() {
+  revState.loading = true; revState.error = ""; setSync("Loading reviews…", false);
+  return call("reviews").then(function (r) {
+    revState.loading = false;
+    if (r && r.ok) { S.reviews = r.reviews; setSync("", false); }
+    else if (r && r.error === "unknown action") revState.error = "The backend script needs the latest update (it doesn't know the reviews request yet).";
+    else revState.error = "Could not load reviews.";
+    setSync("", false); if (UI.tab === "reviews") render();
+  }).catch(function (err) { revState.loading = false; revState.error = "Could not reach the server."; setSync("", false); console.error("reviews", err && err.stack); if (UI.tab === "reviews") render(); });
+}
+function listRows(v) { return (Array.isArray(v) ? v : []).filter(function (r) { return r && String(r.cite || "").trim(); }); }
+function revData() {
+  var rows = [];
+  S.students.forEach(function (st) {
+    var rv = S.reviews && S.reviews[st.id];
+    if (!rv || (!rv.student && !rv.advisor)) return;
+    var sa = rv.student ? rv.student.a || {} : null, aa = rv.advisor ? rv.advisor.a || {} : null;
+    function rating(n) { return aa && typeof aa["r" + n] === "number" ? aa["r" + n] : null; }
+    rows.push({st: st, sa: sa, aa: aa, sSub: rv.student && rv.student.sub, aSub: rv.advisor && rv.advisor.sub,
+      r: {1: rating(1), 2: rating(2), 3: rating(3), 4: typeof st.g4 === "number" ? st.g4 : null},
+      pubs: sa ? listRows(sa.g2_pubs) : [], talks: sa ? listRows(sa.g2_talks) : [], courses: sa ? listRows(sa.g4_courses) : []});
+  });
+  rows.sort(function (a, b) { return a.st.name.localeCompare(b.st.name); });
+  return rows;
+}
+function pct(n, d) { return d ? Math.round(100 * n / d) + "%" : "—"; }
+function rateChip(v) { return h("span", {class: "rate r" + (v || 0), text: v == null ? "–" : String(v), title: v == null ? "Not rated" : v >= 3 ? "Target" : v >= 2 ? "Acceptable" : "Needs improvement"}); }
+function goalStats(rows, n) {
+  var vals = rows.map(function (r) { return r.r[n]; }).filter(function (v) { return v != null; });
+  var d = {1: 0, 2: 0, 3: 0, 4: 0}; vals.forEach(function (v) { d[v]++; });
+  var t = d[3] + d[4], a = d[2], nn = d[1];
+  return {n: vals.length, mean: vals.length ? vals.reduce(function (x, y) { return x + y; }, 0) / vals.length : null, d: d, t: t, a: a, nn: nn};
+}
+function vReviews() {
+  var root = h("div", {});
+  if (!S.reviews && !revState.loading && !revState.error) loadReviews();
+  var rows = S.reviews ? revData() : [];
+  var advs = Array.from(new Set(rows.map(function (r) { return r.st.advisor; }))).sort();
+  root.appendChild(h("div", {class: "toolbar"},
+    h("button", {class: "btn", text: revState.loading ? "Loading…" : "Refresh", onclick: loadReviews}),
+    h("span", {class: "grow"}),
+    h("button", {class: "btn", text: "Copy results text", onclick: function () { copy(resultsText(rows), "Copied results text"); }}),
+    h("button", {class: "btn", text: "Download CSV", onclick: function () { downloadCsv(rows); }})));
+  if (revState.error) { root.appendChild(h("div", {class: "card empty", text: revState.error})); return root; }
+  if (!S.reviews) { root.appendChild(h("div", {class: "card empty", text: "Loading reviews…"})); return root; }
+  var nS = rows.filter(function (r) { return r.sSub; }).length, nA = rows.filter(function (r) { return r.aSub; }).length;
+  var met = rows.filter(function (r) { return r.aa && r.aa.met === "Yes"; }).length;
+  root.appendChild(h("div", {class: "grid g4", style: "margin-bottom:12px"},
+    h("div", {class: "card stat", text: String(nS)}, h("small", {text: "Student reports submitted"})),
+    h("div", {class: "card stat", text: String(nA)}, h("small", {text: "Advisor reviews submitted"})),
+    h("div", {class: "card stat", text: pct(met, nA)}, h("small", {text: "Advisors who discussed it with the student"}))));
+  if (!rows.length) { root.appendChild(h("div", {class: "card empty", text: "No submissions yet. They will appear here as students and advisors submit."})); return root; }
+
+  /* ratings per goal */
+  var gt = h("tbody", {});
+  REV_GOALS.forEach(function (g) {
+    var st = goalStats(rows, g[0]);
+    var bar = h("div", {class: "stack", title: "Target " + st.t + " · Acceptable " + st.a + " · Needs improvement " + st.nn});
+    if (st.n) { bar.appendChild(h("i", {class: "s-t", style: "width:" + 100 * st.t / st.n + "%"})); bar.appendChild(h("i", {class: "s-a", style: "width:" + 100 * st.a / st.n + "%"})); bar.appendChild(h("i", {class: "s-n", style: "width:" + 100 * st.nn / st.n + "%"})); }
+    gt.appendChild(h("tr", {}, h("td", {text: g[1]}), h("td", {text: String(st.n)}), h("td", {text: st.mean == null ? "—" : st.mean.toFixed(2)}),
+      h("td", {text: st.n ? "1:" + st.d[1] + "  2:" + st.d[2] + "  3:" + st.d[3] + "  4:" + st.d[4] : "—"}),
+      h("td", {text: pct(st.t, st.n)}), h("td", {text: pct(st.a, st.n)}), h("td", {text: pct(st.nn, st.n)}), h("td", {}, bar)));
+  });
+  root.appendChild(h("h2", {text: "Advisor ratings by goal"}));
+  root.appendChild(h("div", {class: "tw"}, h("table", {}, h("thead", {}, h("tr", {}, ["Goal", "Rated", "Mean", "Counts", "Target", "Acceptable", "Needs impr.", "Distribution"].map(function (x) { return h("th", {text: x}); }))), gt)));
+  root.appendChild(h("div", {class: "legend", style: "margin:6px 0 18px"}, h("span", {}, h("i", {style: "background:var(--ok)"}), "Target (3-4)"), h("span", {}, h("i", {style: "background:var(--warn)"}), "Acceptable (2)"), h("span", {}, h("i", {style: "background:var(--bad)"}), "Needs improvement (1)"),
+    h("span", {text: "Goal 4 scores are entered by you from course evaluations (open a student below)."})));
+
+  /* student-reported activity */
+  var subm = rows.filter(function (r) { return r.sa; });
+  function cnt(f) { return subm.filter(f).length; }
+  function sum(f) { return subm.reduce(function (a, r) { return a + f(r); }, 0); }
+  function stat(label, value, sub) { return h("tr", {}, h("td", {text: label}), h("td", {text: value}), h("td", {class: "muted", text: sub || ""})); }
+  var pubStatus = {}; subm.forEach(function (r) { r.pubs.forEach(function (p) { pubStatus[p.status || "Unspecified"] = (pubStatus[p.status || "Unspecified"] || 0) + 1; }); });
+  var talkType = {}; subm.forEach(function (r) { r.talks.forEach(function (p) { talkType[p.status || "Unspecified"] = (talkType[p.status || "Unspecified"] || 0) + 1; }); });
+  function brk(o) { return Object.keys(o).map(function (k) { return o[k] + " " + k.toLowerCase(); }).join(", "); }
+  var at = h("tbody", {},
+    stat("Students with at least one publication or manuscript", cnt(function (r) { return r.pubs.length; }) + " of " + subm.length, pct(cnt(function (r) { return r.pubs.length; }), subm.length)),
+    stat("Total publications and manuscripts", String(sum(function (r) { return r.pubs.length; })), brk(pubStatus)),
+    stat("Students who gave a talk or poster", cnt(function (r) { return r.talks.length; }) + " of " + subm.length, pct(cnt(function (r) { return r.talks.length; }), subm.length)),
+    stat("Total talks and posters", String(sum(function (r) { return r.talks.length; })), brk(talkType)),
+    stat("Students who taught", cnt(function (r) { return r.courses.length; }) + " of " + subm.length, pct(cnt(function (r) { return r.courses.length; }), subm.length)),
+    stat("Total courses taught", String(sum(function (r) { return r.courses.length; }))),
+    stat("Students reporting fellowships, grants or awards", cnt(function (r) { return isFilled(r.sa.g2_funding); }) + " of " + subm.length, pct(cnt(function (r) { return isFilled(r.sa.g2_funding); }), subm.length)),
+    stat("Students reporting ethics training", cnt(function (r) { return isFilled(r.sa.g3_ethics); }) + " of " + subm.length, pct(cnt(function (r) { return isFilled(r.sa.g3_ethics); }), subm.length)));
+  root.appendChild(h("h2", {text: "Student-reported activity"}));
+  root.appendChild(h("div", {class: "tw"}, h("table", {}, h("thead", {}, h("tr", {}, h("th", {text: "Metric"}), h("th", {text: "Count"}), h("th", {text: "Detail"}))), at)));
+
+  /* per person */
+  var advSel = h("select", {onchange: function (e) { UI.revAdv = e.target.value; render(); }}, [h("option", {value: "", text: "All advisors"})].concat(advs.map(function (a) { return h("option", {value: a, text: a, selected: UI.revAdv === a}); })));
+  root.appendChild(h("div", {class: "row sp", style: "margin:20px 0 8px"}, h("h2", {text: "By person", style: "margin:0"}), advSel));
+  var pt = h("tbody", {});
+  rows.filter(function (r) { return !UI.revAdv || r.st.advisor === UI.revAdv; }).forEach(function (r) {
+    pt.appendChild(h("tr", {class: "click", tabindex: "0", onclick: function () { reviewDlg(r); }, onkeydown: function (e) { if (e.key === "Enter") reviewDlg(r); }},
+      h("td", {}, h("b", {text: r.st.name})), h("td", {text: r.st.advisor}),
+      h("td", {}, r.sSub ? badge("In", "ok") : badge("—", "idle")), h("td", {}, r.aSub ? badge("In", "ok") : badge("—", "idle")),
+      h("td", {}, rateChip(r.r[1])), h("td", {}, rateChip(r.r[2])), h("td", {}, rateChip(r.r[3])), h("td", {}, rateChip(r.r[4])),
+      h("td", {text: r.sa ? String(r.pubs.length) : "—"}), h("td", {text: r.sa ? String(r.talks.length) : "—"}), h("td", {text: r.sa ? String(r.courses.length) : "—"}),
+      h("td", {text: r.aa ? (r.aa.met || "—") : "—"})));
+  });
+  root.appendChild(h("div", {class: "tw"}, h("table", {}, h("thead", {}, h("tr", {}, ["Student", "Advisor", "Report", "Review", "G1", "G2", "G3", "G4", "Pubs", "Talks", "Taught", "Discussed"].map(function (x) { return h("th", {text: x}); }))), pt)));
+  root.appendChild(h("p", {class: "small muted", text: "Click a person to read their full responses and the advisor's comments. Only each person's latest submission is shown."}));
+  return root;
+}
+function qa(label, value) {
+  var has = isFilled(value);
+  return h("div", {class: "qa"}, h("div", {class: "q", text: label}), h("div", {class: "a" + (has ? "" : " none"), text: has ? value : "Nothing entered"}));
+}
+function listText(v) { return listRows(v).map(function (p) { return "• " + [p.term, p.cite, p.status].filter(Boolean).join(" — "); }).join("\n"); }
+function reviewDlg(r) {
+  dialog(function (el, close) {
+    el.appendChild(h("div", {class: "row sp"}, h("h2", {text: r.st.name}), h("button", {class: "btn", text: "Close", onclick: close})));
+    el.appendChild(h("div", {class: "small muted", style: "margin-bottom:6px", text: "Advisor: " + r.st.advisor + " · Student report " + (r.sSub ? "submitted " + fmtDate(r.sSub) : "not submitted") + " · Advisor review " + (r.aSub ? "submitted " + fmtDate(r.aSub) : "not submitted")}));
+    el.appendChild(h("div", {class: "row", style: "margin:8px 0"}, h("button", {class: "btn", text: "Copy everything", onclick: function () { copy(personText(r), "Copied"); }})));
+    el.appendChild(h("div", {class: "sec"}, h("h3", {text: "Advisor review"})));
+    if (!r.aa) el.appendChild(h("p", {class: "muted", text: "Not submitted yet."}));
+    else {
+      [[1, "c1"], [2, "c2"], [3, "c3"]].forEach(function (g) {
+        el.appendChild(h("div", {class: "qa"}, h("div", {class: "q", text: REV_GOALS[g[0] - 1][1]}), h("div", {class: "row"}, rateChip(r.r[g[0]]), h("span", {class: "small muted", text: r.r[g[0]] ? (r.r[g[0]] >= 3 ? "Target" : r.r[g[0]] >= 2 ? "Acceptable" : "Needs improvement") : "Not rated"})), qa("Comments", r.aa[g[1]]).lastChild));
+      });
+      el.appendChild(qa("Teaching comments", r.aa.c4));
+      el.appendChild(qa("Overall assessment and next steps", r.aa.c_overall));
+      el.appendChild(qa("Discussed with the student?", r.aa.met));
+    }
+    var g4 = h("select", {"aria-label": "Teaching score", onchange: function (e) { r.st.g4 = e.target.value ? Number(e.target.value) : ""; save("students", r.st); }},
+      [["", "Not scored"], ["1", "1"], ["2", "2"], ["3", "3"], ["4", "4"]].map(function (o) { return h("option", {value: o[0], text: o[1], selected: String(r.st.g4 == null ? "" : r.st.g4) === o[0]}); }));
+    el.appendChild(h("label", {class: "f", style: "max-width:220px"}, "Goal 4 teaching score (from course evaluations)", g4));
+    el.appendChild(h("div", {class: "sec"}, h("h3", {text: "Student report"})));
+    if (!r.sa) el.appendChild(h("p", {class: "muted", text: "Not submitted yet."}));
+    else REV_STUDENT.forEach(function (sec) {
+      el.appendChild(h("h3", {text: sec[0], style: "margin-top:14px"}));
+      sec[1].forEach(function (f) { el.appendChild(qa(f[1], f[2] === "list" ? listText(r.sa[f[0]]) : r.sa[f[0]])); });
+    });
+  });
+}
+function personText(r) {
+  var L = [r.st.name + " (advisor: " + r.st.advisor + ")", ""];
+  L.push("ADVISOR REVIEW");
+  if (!r.aa) L.push("Not submitted.");
+  else {
+    [1, 2, 3].forEach(function (n) { L.push(REV_GOALS[n - 1][1] + ": " + (r.r[n] || "not rated")); if (isFilled(r.aa["c" + n])) L.push(r.aa["c" + n]); });
+    if (isFilled(r.aa.c4)) L.push("Teaching comments: " + r.aa.c4);
+    if (isFilled(r.aa.c_overall)) L.push("Overall: " + r.aa.c_overall);
+    L.push("Discussed with student: " + (r.aa.met || "—"));
+  }
+  if (r.st.g4) L.push("Goal 4 teaching score: " + r.st.g4);
+  L.push("", "STUDENT REPORT");
+  if (!r.sa) L.push("Not submitted.");
+  else REV_STUDENT.forEach(function (sec) {
+    L.push("", sec[0]);
+    sec[1].forEach(function (f) { var v = f[2] === "list" ? listText(r.sa[f[0]]) : r.sa[f[0]]; if (isFilled(v)) L.push(f[1] + ": " + v); });
+  });
+  return L.join("\n");
+}
+function resultsText(rows) {
+  var L = [], nA = rows.filter(function (r) { return r.aSub; }).length, nS = rows.filter(function (r) { return r.sSub; }).length;
+  L.push("Annual report 2025-2026: " + nS + " student reports and " + nA + " advisor reviews received.");
+  REV_GOALS.forEach(function (g) {
+    var s = goalStats(rows, g[0]);
+    if (!s.n) return;
+    L.push(g[1] + ": " + s.n + " rated; mean " + s.mean.toFixed(2) + "; " + pct(s.t, s.n) + " Target (" + s.t + "), " + pct(s.a, s.n) + " Acceptable (" + s.a + "), " + pct(s.nn, s.n) + " Needs improvement (" + s.nn + ").");
+  });
+  var subm = rows.filter(function (r) { return r.sa; });
+  var pubs = subm.reduce(function (a, r) { return a + r.pubs.length; }, 0), talks = subm.reduce(function (a, r) { return a + r.talks.length; }, 0);
+  L.push("Students reported " + pubs + " publications/manuscripts and " + talks + " talks/posters; " + subm.filter(function (r) { return r.courses.length; }).length + " of " + subm.length + " taught.");
+  return L.join("\n");
+}
+function downloadCsv(rows) {
+  function q(v) { return '"' + String(v == null ? "" : v).replace(/"/g, '""') + '"'; }
+  var head = ["Student", "Advisor", "Student submitted", "Advisor submitted", "Goal1", "Goal2", "Goal3", "Goal4", "Publications", "Talks/posters", "Courses taught", "Discussed", "Overall comment"];
+  var lines = [head.map(q).join(",")];
+  rows.forEach(function (r) {
+    lines.push([r.st.name, r.st.advisor, r.sSub || "", r.aSub || "", r.r[1], r.r[2], r.r[3], r.r[4], r.sa ? r.pubs.length : "", r.sa ? r.talks.length : "", r.sa ? r.courses.length : "", r.aa ? r.aa.met : "", r.aa ? r.aa.c_overall : ""].map(q).join(","));
+  });
+  var a = h("a", {href: URL.createObjectURL(new Blob([lines.join("\n")], {type: "text/csv"})), download: "bbc-reviews-2025-2026.csv"});
+  document.body.appendChild(a); a.click(); a.remove();
 }
 
 /* ---------- settings ---------- */
