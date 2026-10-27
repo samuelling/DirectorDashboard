@@ -52,6 +52,8 @@ label.f>input,label.f>select,label.f>textarea{display:block;width:100%;margin-to
 .b-idle{background:var(--idle-bg);color:var(--idle)}
 .tw{overflow-x:auto;border:1px solid var(--line);border-radius:10px;background:var(--panel)}
 table{border-collapse:collapse;width:100%}
+th[data-arrow]::after{content:attr(data-arrow);font-size:10px}
+th[aria-sort]:hover{color:var(--ink,#111)}
 th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--line);vertical-align:middle}
 th{font-size:12px;color:var(--muted);font-weight:600;white-space:nowrap}
 tr:last-child td{border-bottom:0}
@@ -261,6 +263,48 @@ function render() {
   app.appendChild(nav);
   var view = {overview: vOverview, tasks: vTasks, students: vStudents, funding: vFunding, notes: vNotes, report: vReport, reviews: vReviews, history: vHistory, settings: vSettings}[UI.tab];
   app.appendChild(view());
+  sortable();
+}
+
+/* ---------- click-to-sort for every table ---------- */
+UI.sort = UI.sort || {};
+function cellKey(td) {
+  var i = td.querySelector("input,select"), t = (i ? i.value : td.textContent).trim();
+  return t;
+}
+function sortable() {
+  var tables = app.querySelectorAll("table");
+  Array.prototype.forEach.call(tables, function (tb, ti) {
+    var id = UI.tab + ":" + (UI.hv || "") + ":" + ti, ths = tb.querySelectorAll("thead th"), body = tb.tBodies[0];
+    if (!body || body.rows.length < 2) return;
+    function apply(col, dir) {
+      var rows = Array.prototype.slice.call(body.rows);
+      var keys = rows.map(function (r) { return r.cells[col] ? cellKey(r.cells[col]) : ""; });
+      var numeric = keys.every(function (k) { return k === "" || k === "—" || /^-?[\d.,]+%?$/.test(k); });
+      var idx = rows.map(function (r, i) { return i; });
+      idx.sort(function (a, b) {
+        var x = keys[a], y = keys[b], ex = x === "" || x === "—", ey = y === "" || y === "—";
+        if (ex !== ey) return ex ? 1 : -1;            // blanks always last
+        var c = numeric ? parseFloat(x.replace(/,/g, "")) - parseFloat(y.replace(/,/g, "")) : x.localeCompare(y, undefined, {numeric: true, sensitivity: "base"});
+        return (c || a - b) * dir;
+      });
+      idx.forEach(function (i) { body.appendChild(rows[i]); });
+    }
+    Array.prototype.forEach.call(ths, function (th, col) {
+      if (!th.textContent.trim()) return;
+      th.style.cursor = "pointer"; th.title = "Click to sort"; th.setAttribute("aria-sort", "none");
+      var st = UI.sort[id];
+      if (st && st.col === col) { th.setAttribute("aria-sort", st.dir > 0 ? "ascending" : "descending"); th.dataset.arrow = st.dir > 0 ? " ▲" : " ▼"; }
+      th.addEventListener("click", function () {
+        var cur = UI.sort[id], dir = cur && cur.col === col ? -cur.dir : 1;
+        UI.sort[id] = {col: col, dir: dir};
+        Array.prototype.forEach.call(ths, function (t) { t.setAttribute("aria-sort", "none"); delete t.dataset.arrow; });
+        th.setAttribute("aria-sort", dir > 0 ? "ascending" : "descending"); th.dataset.arrow = dir > 0 ? " ▲" : " ▼";
+        apply(col, dir);
+      });
+      if (st && st.col === col) apply(col, st.dir);
+    });
+  });
 }
 
 /* ---------- overview ---------- */
@@ -712,7 +756,7 @@ function vHistory() {
   if (!S.reviews && !revState.loading && !revState.error) loadReviews();
   var views = [["outcomes", "Program outcomes"], ["people", "People over time"], ["funding", "Funding by year"], ["cohorts", "Earlier cohorts (2018)"]];
   var bar = h("div", {class: "toolbar"});
-  views.forEach(function (v) { bar.appendChild(h("button", {class: "btn" + (hist.view === v[0] ? " primary" : ""), text: v[1], onclick: function () { hist.view = v[0]; render(); }})); });
+  views.forEach(function (v) { bar.appendChild(h("button", {class: "btn" + (hist.view === v[0] ? " primary" : ""), text: v[1], onclick: function () { hist.view = v[0]; UI.hv = v[0]; render(); }})); });
   bar.appendChild(h("span", {class: "grow"}));
   bar.appendChild(h("button", {class: "btn", text: hist.loading ? "Loading…" : "Refresh", onclick: loadArchive}));
   root.appendChild(bar);
