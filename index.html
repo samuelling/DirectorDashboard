@@ -246,7 +246,7 @@ function loadAll(first) {
 }
 
 /* ---------- shell ---------- */
-var TABS = [["overview", "Overview"], ["tasks", "Tasks"], ["students", "Students"], ["funding", "Funding 26-27"], ["notes", "Notes"], ["report", "Annual report"], ["reviews", "Reviews 25/26"], ["settings", "Settings"]];
+var TABS = [["overview", "Overview"], ["tasks", "Tasks"], ["students", "Students"], ["funding", "Funding 26-27"], ["notes", "Notes"], ["report", "Annual report"], ["reviews", "Reviews 25/26"], ["history", "History"], ["settings", "Settings"]];
 function render() {
   var openDlg = document.querySelector("dialog[open]");
   if (openDlg) return; // don't clobber an open editor
@@ -259,7 +259,7 @@ function render() {
     nav.appendChild(h("button", {role: "tab", "aria-selected": String(UI.tab === t[0]), text: t[1], onclick: function () { UI.tab = t[0]; render(); }}));
   });
   app.appendChild(nav);
-  var view = {overview: vOverview, tasks: vTasks, students: vStudents, funding: vFunding, notes: vNotes, report: vReport, reviews: vReviews, settings: vSettings}[UI.tab];
+  var view = {overview: vOverview, tasks: vTasks, students: vStudents, funding: vFunding, notes: vNotes, report: vReport, reviews: vReviews, history: vHistory, settings: vSettings}[UI.tab];
   app.appendChild(view());
 }
 
@@ -694,6 +694,129 @@ function qa(label, value) {
   return h("div", {class: "qa"}, h("div", {class: "q", text: label}), h("div", {class: "a" + (has ? "" : " none"), text: has ? value : "Nothing entered"}));
 }
 function listText(v) { return listRows(v).map(function (p) { return "• " + [p.term, p.cite, p.status].filter(Boolean).join(" — "); }).join("\n"); }
+/* ---------- history / archive ---------- */
+var hist = {loading: false, error: "", view: "outcomes", q: ""};
+function loadArchive() {
+  hist.loading = true; hist.error = ""; setSync("Loading history…", false);
+  return call("archive").then(function (r) {
+    hist.loading = false;
+    if (r && r.ok) S.archive = r.archive; else hist.error = r && r.error === "unknown action" ? "The backend script needs the latest update." : "Could not load history.";
+    setSync("", false); if (UI.tab === "history") render();
+  }).catch(function () { hist.loading = false; hist.error = "Could not reach the server."; setSync("", false); if (UI.tab === "history") render(); });
+}
+function hSlug(x) { return String(x || "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, ""); }
+function pctOf(o) { return o ? o.target + "% / " + o.acceptable + "% / " + o.needs + "%" : "—"; }
+function vHistory() {
+  var root = h("div", {});
+  if (!S.archive && !hist.loading && !hist.error) loadArchive();
+  if (!S.reviews && !revState.loading && !revState.error) loadReviews();
+  var views = [["outcomes", "Program outcomes"], ["people", "People over time"], ["funding", "Funding by year"], ["cohorts", "Earlier cohorts (2018)"]];
+  var bar = h("div", {class: "toolbar"});
+  views.forEach(function (v) { bar.appendChild(h("button", {class: "btn" + (hist.view === v[0] ? " primary" : ""), text: v[1], onclick: function () { hist.view = v[0]; render(); }})); });
+  bar.appendChild(h("span", {class: "grow"}));
+  bar.appendChild(h("button", {class: "btn", text: hist.loading ? "Loading…" : "Refresh", onclick: loadArchive}));
+  root.appendChild(bar);
+  if (hist.error) { root.appendChild(h("div", {class: "card empty", text: hist.error})); return root; }
+  if (!S.archive) { root.appendChild(h("div", {class: "card empty", text: "Loading history…"})); return root; }
+  var A = S.archive;
+  if (hist.view === "outcomes") root.appendChild(histOutcomes(A));
+  else if (hist.view === "people") root.appendChild(histPeople(A));
+  else if (hist.view === "funding") root.appendChild(histFunding(A));
+  else root.appendChild(histCohorts(A));
+  return root;
+}
+function histOutcomes(A) {
+  var cyc = A.history.slice().sort(function (a, b) { return a.cycle.localeCompare(b.cycle); }), wrap = h("div", {});
+  var live = null;
+  if (S.reviews) { var rows = revData(); if (rows.some(function (r) { return r.aSub; })) live = [1, 2, 3, 4].map(function (n) { return goalStats(rows, n); }); }
+  var th = h("tr", {}, h("th", {text: "Goal"}));
+  cyc.forEach(function (c) { th.appendChild(h("th", {text: "Cycle " + c.cycle})); });
+  th.appendChild(h("th", {text: "Cycle 2026 (live)"}));
+  var tb = h("tbody", {});
+  [1, 2, 3].forEach(function (n) {
+    var tr = h("tr", {}, h("td", {text: REV_GOALS[n - 1][1]}));
+    cyc.forEach(function (c) { var g = c["g" + n]; tr.appendChild(h("td", {text: g ? "mean " + g.mean.toFixed(1) + " · " + pctOf(g) : "not reported"})); });
+    var l = live && live[n - 1]; tr.appendChild(h("td", {text: l && l.n ? "mean " + l.mean.toFixed(1) + " · " + Math.round(100 * l.t / l.n) + "% / " + Math.round(100 * l.a / l.n) + "% / " + Math.round(100 * l.nn / l.n) + "% (n=" + l.n + ")" : "—"}));
+    tb.appendChild(tr);
+  });
+  var t4 = h("tr", {}, h("td", {text: REV_GOALS[3][1]}));
+  cyc.forEach(function (c) { var g = c.g4; t4.appendChild(h("td", {text: g ? "Fall " + g.fall.n + " TFs: " + g.fall.target + " Target, " + g.fall.acceptable + " Acceptable · Spring " + g.spring.n + " TFs: " + g.spring.target + " Target, " + g.spring.acceptable + " Acceptable" : "—"})); });
+  var l4 = live && live[3]; t4.appendChild(h("td", {text: l4 && l4.n ? "n=" + l4.n + " scored; mean " + l4.mean.toFixed(1) : "—"}));
+  tb.appendChild(t4);
+  wrap.appendChild(h("div", {class: "tw"}, h("table", {}, h("thead", {}, th), tb)));
+  wrap.appendChild(h("p", {class: "small muted", text: "Goals 1–3: percent Target / Acceptable / Needs improvement (mentor ratings 1–4). Goal 4 from course evaluations. Cycle ends 11/15 of the named year."}));
+  cyc.forEach(function (c) { wrap.appendChild(h("div", {class: "card", style: "margin-top:10px"}, h("h3", {text: "Cycle " + c.cycle + " · " + c.period}), h("p", {class: "small", text: c.note + (c.g4 && c.g4.text ? " " + c.g4.text : "")}), h("p", {class: "small muted", text: "Source: " + c.source}))); });
+  return wrap;
+}
+function histPeopleIndex(A) {
+  var by = {};
+  function get(sid, name) {
+    var k = sid || "n-" + hSlug(name);
+    if (!by[k]) by[k] = {key: k, sid: sid, name: sid && names1(sid) || name, records: [], funding: [], alumni: []};
+    return by[k];
+  }
+  function names1(sid) { var s = S.students.filter(function (x) { return x.id === sid; })[0]; return s ? s.name : ""; }
+  S.students.forEach(function (s) { get(s.id, s.name); });
+  A.records.forEach(function (r) { get(r.sid, r.name).records.push(r); });
+  A.funding.forEach(function (r) { get(r.sid, r.name).funding.push(r); });
+  A.alumni.forEach(function (r) { get(r.sid, r.name).alumni.push(r); });
+  return Object.keys(by).map(function (k) { return by[k]; }).sort(function (a, b) { return a.name.localeCompare(b.name); });
+}
+function histPeople(A) {
+  var wrap = h("div", {}), list = histPeopleIndex(A);
+  wrap.appendChild(h("div", {class: "toolbar"}, h("input", {type: "search", placeholder: "Search by name…", value: hist.q, "aria-label": "Search people", style: "max-width:260px", oninput: function (e) { hist.q = e.target.value; var pos = e.target.selectionStart; render(); var i = document.querySelector("input[type=search]"); if (i) { i.focus(); i.setSelectionRange(pos, pos); } }})));
+  var tb = h("tbody", {}), q = hist.q.toLowerCase();
+  list.filter(function (p) { return !q || p.name.toLowerCase().indexOf(q) >= 0; }).forEach(function (p) {
+    var cur = !!p.sid && S.students.some(function (s) { return s.id === p.sid && s.status === "active"; });
+    var yrs = p.records.map(function (r) { return r.year; }).sort().join(", ");
+    tb.appendChild(h("tr", {}, h("td", {}, h("button", {class: "link", text: p.name, onclick: function () { personDlg(p); }})), h("td", {text: cur ? "Current" : "Former / earlier"}), h("td", {text: yrs || "—"}), h("td", {text: p.funding.map(function (f) { return f.year; }).join(", ") || "—"}), h("td", {text: p.alumni.length ? "Yes (2018)" : ""})));
+  });
+  wrap.appendChild(h("div", {class: "tw"}, h("table", {}, h("thead", {}, h("tr", {}, ["Name", "Status", "Progress reports", "Funding records", "In 2018 milestones"].map(function (x) { return h("th", {text: x}); }))), tb)));
+  return wrap;
+}
+function personDlg(p) {
+  dialog(function (el, close) {
+    el.appendChild(h("div", {class: "row sp"}, h("h2", {text: p.name}), h("button", {class: "btn", text: "Close", onclick: close})));
+    if (!p.records.length && !p.funding.length && !p.alumni.length) el.appendChild(h("p", {class: "muted", text: "No archived records for this person yet."}));
+    p.alumni.forEach(function (a) {
+      el.appendChild(h("div", {class: "sec"}, h("h3", {text: "2018 milestones snapshot"})));
+      el.appendChild(h("p", {class: "small", text: "Entered " + (a.cohort || "?") + " (" + (a.entry || "?") + ") · Mentor " + (a.mentor || "?") + " · Courses " + (a.courses || "—") + " · Quals " + (a.qual || "—") + " · Prospectus hearing " + (a.prospectusHearing || "—") + " · Defense " + (a.defense || "—") + (a.position ? " · After: " + a.position : "")}));
+    });
+    p.funding.slice().sort(function (a, b) { return a.year.localeCompare(b.year); }).forEach(function (f) {
+      el.appendChild(h("div", {class: "sec"}, h("h3", {text: "Funding " + f.year})));
+      el.appendChild(h("p", {class: "small", text: f.kind === "summer" ? "Definite: " + (f.definite || "—") + " · Potential: " + (f.potential || "—") + " · Requested from PBS: " + (f.requested || "—") : "Fall " + (f.fall || "—") + " · Spring " + (f.spring || "—") + " · Next year: " + (f.nextFall || "—") + " / " + (f.nextSpring || "—") + (f.note ? " · " + f.note : "")}));
+    });
+    p.records.slice().sort(function (a, b) { return a.year.localeCompare(b.year); }).forEach(function (r) {
+      el.appendChild(h("div", {class: "sec"}, h("h3", {text: "Progress report " + r.year})));
+      el.appendChild(h("p", {class: "small", text: "Advisor: " + (r.advisor || "—") + " · Entry " + (r.entry || "—") + " · Qualifying exam " + (r.qual || "—") + " · Prospectus " + (r.prospectus || "—")}));
+      Object.keys(r.sections).sort().forEach(function (k) {
+        var txt = r.sections[k]; if (!txt) return;
+        var first = txt.split("\n")[0].slice(0, 60);
+        el.appendChild(h("details", {}, h("summary", {text: k + ". " + first}), h("pre", {class: "small", style: "white-space:pre-wrap", text: txt})));
+      });
+    });
+  });
+}
+function histFunding(A) {
+  var wrap = h("div", {}), rows = {};
+  function get(sid, name) { var k = sid || "n-" + hSlug(name); return rows[k] = rows[k] || {name: name, sid: sid, ay: null, su: null}; }
+  S.students.forEach(function (s) { var r = get(s.id, s.name); r.cur = s; });
+  A.funding.forEach(function (f) { var r = get(f.sid, f.name); if (f.kind === "summer") r.su = f; else r.ay = f; });
+  var tb = h("tbody", {});
+  Object.keys(rows).map(function (k) { return rows[k]; }).sort(function (a, b) { return a.name.localeCompare(b.name); }).forEach(function (r) {
+    var ay = r.ay, su = r.su, c = r.cur;
+    tb.appendChild(h("tr", {}, h("td", {text: r.name}), h("td", {text: ay ? (ay.fall || "—") + " / " + (ay.spring || "—") : "—"}), h("td", {text: ay ? (ay.nextFall || "—") + " / " + (ay.nextSpring || "—") : "—"}), h("td", {class: "small", text: su ? (su.definite || "None") + (su.potential ? " (potential: " + su.potential + ")" : "") : "—"}), h("td", {text: c && c.aid ? (c.aid.fall || "—") + " / " + (c.aid.spring || "—") : "—"}), h("td", {class: "small muted", text: ay && ay.note || ""})));
+  });
+  wrap.appendChild(h("div", {class: "tw"}, h("table", {}, h("thead", {}, h("tr", {}, ["Name", "AY 24-25 (F / S)", "Planned for 25-26 (F / S)", "Summer 2026", "FY 26-27 (F / S)", "Notes"].map(function (x) { return h("th", {text: x}); }))), tb)));
+  wrap.appendChild(h("p", {class: "small muted", text: "Sources: PBS AY 24-25 funding sheet (BBC tab), Summer 2026 projections, and the FY 26-27 obligated funding sheet."}));
+  return wrap;
+}
+function histCohorts(A) {
+  var tb = h("tbody", {});
+  A.alumni.forEach(function (a) { tb.appendChild(h("tr", {}, h("td", {text: a.cohort}), h("td", {text: a.name}), h("td", {text: a.mentor}), h("td", {text: a.courses || "—"}), h("td", {text: a.qual || "—"}), h("td", {text: a.prospectusHearing || "—"}), h("td", {text: a.defense || "—"}), h("td", {class: "small", text: a.position || ""}))); });
+  return h("div", {}, h("div", {class: "tw"}, h("table", {}, h("thead", {}, h("tr", {}, ["Cohort", "Name", "Mentor", "Courses", "Quals", "Prospectus", "Defense", "Position after"].map(function (x) { return h("th", {text: x}); }))), tb)), h("p", {class: "small muted", text: "As of the April 2018 milestones report."}));
+}
+
 function reviewDlg(r) {
   dialog(function (el, close) {
     el.appendChild(h("div", {class: "row sp"}, h("h2", {text: r.st.name}), h("button", {class: "btn", text: "Close", onclick: close})));
