@@ -108,6 +108,8 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
 .sec{border-top:1px solid var(--line);padding-top:12px;margin-top:14px}
 .sec h3{margin-top:0}
 .legend{display:flex;gap:12px;flex-wrap:wrap;font-size:12px;color:var(--muted);align-items:center}
+.flag{display:inline-block;padding:0 6px;border-radius:999px;font-size:11px;font-weight:600;border:1px solid currentColor;margin-left:6px;vertical-align:1px}
+.flag.medium{color:var(--warn)}.flag.low{color:var(--bad)}.flag.high{display:none}
 .legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:4px;vertical-align:-1px}
 </style>
 </head>
@@ -990,16 +992,18 @@ function histPeopleIndex(A) {
   var by = {};
   function get(sid, name) {
     var k = sid || "n-" + nameKey(name);
-    if (!by[k]) by[k] = {key: k, sid: sid, name: sid ? (names1(sid) || niceName(name)) : niceName(name), records: [], funding: [], alumni: []};
+    if (!by[k]) by[k] = {key: k, sid: sid, name: sid ? (names1(sid) || niceName(name)) : niceName(name), records: [], funding: [], alumni: [], outcome: null};
     return by[k];
   }
   function names1(sid) { var s = S.students.filter(function (x) { return x.id === sid; })[0]; return s ? s.name : ""; }
   S.students.forEach(function (s) { get(s.id, s.name); });
   A.records.forEach(function (r) { get(r.sid, r.name).records.push(r); });
-  A.alumni.forEach(function (r) { get(r.sid, r.name).alumni.push(r); });
+  A.alumni.forEach(function (r) { var p = get(r.sid, r.name); if (r.kind === "outcome") p.outcome = r; else p.alumni.push(r); });
   A.funding.forEach(function (r) { get(r.sid, r.name).funding.push(r); });
   return Object.keys(by).map(function (k) { return by[k]; }).sort(function (a, b) { return a.name.localeCompare(b.name); });
 }
+function confFlag(c) { return c && c !== "high" ? h("span", {class: "flag " + c, text: c === "low" ? "unverified" : "unconfirmed", title: c === "low" ? "Weak or ambiguous match — check before using" : "Plausible but not fully confirmed"}) : null; }
+function outcomeText(o) { return o ? [o.position, o.employer].filter(Boolean).join(", ") : ""; }
 function histPeople(A) {
   var wrap = h("div", {}), list = histPeopleIndex(A);
   wrap.appendChild(h("div", {class: "toolbar"}, h("label", {class: "small muted", for: "psearch", text: "Find a person"}), h("input", {id: "psearch", type: "search", placeholder: "Name…", value: hist.q, "aria-label": "Find a person", style: "max-width:260px", oninput: function (e) { hist.q = e.target.value; var pos = e.target.selectionStart; render(); var i = document.getElementById("psearch"); if (i) { i.focus(); i.setSelectionRange(pos, pos); } }})));
@@ -1007,15 +1011,33 @@ function histPeople(A) {
   list.filter(function (p) { return !q || p.name.toLowerCase().indexOf(q) >= 0; }).forEach(function (p) {
     var cur = !!p.sid && S.students.some(function (s) { return s.id === p.sid && s.status === "active"; });
     var yrs = p.records.map(function (r) { return r.year; }).sort().join(", ");
-    tb.appendChild(h("tr", {}, h("td", {}, h("button", {class: "link", text: p.name, onclick: function () { personDlg(p); }})), h("td", {}, badge(cur ? "Current" : "Former", cur ? "ok" : "idle")), h("td", {text: yrs || "—"}), h("td", {text: p.funding.map(function (f) { return f.year; }).join(", ") || "—"}), h("td", {text: p.alumni.length ? p.alumni.map(function (a) { return a.asOf.slice(0, 4); }).join(", ") : ""})));
+    var oc = h("td", {class: "small"});
+    if (p.outcome && outcomeText(p.outcome)) { oc.appendChild(h("span", {text: outcomeText(p.outcome)})); var fl = confFlag(p.outcome.confidence); if (fl) oc.appendChild(fl); }
+    else if (!cur) oc.appendChild(h("span", {class: "muted", text: "—"}));
+    tb.appendChild(h("tr", {}, h("td", {}, h("button", {class: "link", text: p.name, onclick: function () { personDlg(p); }})), h("td", {}, badge(cur ? "Current" : "Former", cur ? "ok" : "idle")), oc, h("td", {text: yrs || "—"}), h("td", {text: p.funding.map(function (f) { return f.year; }).join(", ") || "—"}), h("td", {text: p.alumni.length ? p.alumni.map(function (a) { return a.asOf.slice(0, 4); }).join(", ") : ""})));
   });
-  wrap.appendChild(h("div", {class: "tw"}, h("table", {}, h("thead", {}, h("tr", {}, ["Name", "Status", "Progress reports", "Funding records", "Milestone reports"].map(function (x) { return h("th", {text: x}); }))), tb)));
+  wrap.appendChild(h("div", {class: "tw"}, h("table", {}, h("thead", {}, h("tr", {}, ["Name", "Status", "Where they are now", "Progress reports", "Funding records", "Milestone reports"].map(function (x) { return h("th", {text: x}); }))), tb)));
   return wrap;
 }
 function personDlg(p) {
   dialog(function (el, close) {
     el.appendChild(h("div", {class: "row sp"}, h("h2", {text: p.name}), h("button", {class: "btn", text: "Close", onclick: close})));
-    if (!p.records.length && !p.funding.length && !p.alumni.length) el.appendChild(h("p", {class: "muted", text: "No archived records for this person yet."}));
+    if (!p.records.length && !p.funding.length && !p.alumni.length && !p.outcome) el.appendChild(h("p", {class: "muted", text: "No archived records for this person yet."}));
+    if (p.outcome) {
+      var o = p.outcome, sec = h("div", {class: "sec"}, h("h3", {text: "Where they are now"}));
+      el.appendChild(sec);
+      var line = h("p", {class: "small"}, h("span", {text: outcomeText(o) || "Not found"}));
+      var fl = confFlag(o.confidence); if (fl) line.appendChild(fl);
+      el.appendChild(line);
+      var bits = [];
+      if (o.phd_year) bits.push("PhD " + o.phd_year);
+      if (o.as_of) bits.push("source reflects " + o.as_of);
+      if (bits.length) el.appendChild(h("p", {class: "small muted", text: bits.join(" · ")}));
+      if (o.dissertation) el.appendChild(h("p", {class: "small muted", text: "Dissertation: " + o.dissertation}));
+      if (o.note) el.appendChild(h("p", {class: "small muted", text: o.note}));
+      if (o.url) el.appendChild(h("p", {class: "small"}, h("a", {href: o.url, target: "_blank", rel: "noopener", text: "Source"})));
+      el.appendChild(h("p", {class: "small muted", text: "Found by web search, not confirmed with the person. Correct it in the program records if it is wrong."}));
+    }
     p.alumni.forEach(function (a) {
       el.appendChild(h("div", {class: "sec"}, h("h3", {text: "Milestones snapshot " + a.asOf})));
       el.appendChild(h("p", {class: "small", text: "Entered " + (a.cohort || "?") + " (" + (a.entry || "?") + ") · Mentor " + (a.mentor || "?") + " · Courses " + (a.courses || "—") + " · Quals " + (a.qual || "—") + " · Prospectus hearing " + (a.prospectusHearing || "—") + " · Defense " + (a.defense || "—") + (a.position ? " · After: " + a.position : "")}));
@@ -1051,7 +1073,7 @@ function histFunding(A) {
 }
 function histCohorts(A) {
   var tb = h("tbody", {});
-  A.alumni.slice().sort(function (a, b) { return b.asOf.localeCompare(a.asOf) || b.cohort.localeCompare(a.cohort) || a.name.localeCompare(b.name); }).forEach(function (a) {
+  A.alumni.filter(function (a) { return a.kind !== "outcome"; }).slice().sort(function (a, b) { return b.asOf.localeCompare(a.asOf) || b.cohort.localeCompare(a.cohort) || a.name.localeCompare(b.name); }).forEach(function (a) {
     var f = a.funding || {};
     tb.appendChild(h("tr", {}, h("td", {text: a.asOf}), h("td", {text: a.cohort}), h("td", {text: a.name}), h("td", {text: a.mentor}), h("td", {text: a.courses || "—"}), h("td", {text: a.qual || "—"}), h("td", {text: a.prospectusHearing || "—"}), h("td", {text: a.defense || "—"}), h("td", {class: "small", text: a.position || ""}), h("td", {class: "small", text: [f["15-16"], f["16-17"], f["17-18"]].map(function (x) { return x || "—"; }).join(" · ")})));
   });
