@@ -248,7 +248,7 @@ function loadAll(first) {
 }
 
 /* ---------- shell ---------- */
-var TABS = [["overview", "Overview"], ["tasks", "Tasks"], ["students", "Students"], ["funding", "Funding"], ["notes", "Notes"], ["report", "Annual report"], ["reviews", "Annual Reviews"], ["history", "History"], ["settings", "Settings"]];
+var TABS = [["overview", "Overview"], ["tasks", "Tasks"], ["students", "Students"], ["funding", "Funding"], ["notes", "Notes"], ["reviews", "Annual Report"], ["history", "History"], ["settings", "Settings"]];
 function render() {
   var openDlg = document.querySelector("dialog[open]");
   if (openDlg) return; // don't clobber an open editor
@@ -261,7 +261,7 @@ function render() {
     nav.appendChild(h("button", {role: "tab", "aria-selected": String(UI.tab === t[0]), text: t[1], onclick: function () { UI.tab = t[0]; render(); }}));
   });
   app.appendChild(nav);
-  var view = {overview: vOverview, tasks: vTasks, students: vStudents, funding: vFunding, notes: vNotes, report: vReport, reviews: vReviews, history: vHistory, settings: vSettings}[UI.tab];
+  var view = {overview: vOverview, tasks: vTasks, students: vStudents, funding: vFunding, notes: vNotes, reviews: vReviews, history: vHistory, settings: vSettings}[UI.tab];
   app.appendChild(view());
   sortable();
 }
@@ -783,7 +783,14 @@ function vReviews() {
   if (!S.archive && !hist.loading && !hist.error) loadArchive();
   reviewYears().forEach(function (y) { bar.appendChild(h("button", {class: "btn" + (UI.ay === y ? " primary" : ""), text: y.replace(/^(\d{4})-(\d\d)$/, "$1–$2") + (y === "2025-26" ? " (live)" : ""), onclick: function () { UI.ay = y; UI.hv = "ar" + y; render(); }})); });
   root.appendChild(bar);
-  if (UI.ay === "2025-26") { root.appendChild(vReviewsLive()); return root; }
+  if (UI.ay === "2025-26") {
+    UI.lv = UI.lv || "status";
+    var sub = h("div", {class: "toolbar"});
+    [["status", "Submission status"], ["results", "Results and reviews"]].forEach(function (v) { sub.appendChild(h("button", {class: "btn" + (UI.lv === v[0] ? " primary" : ""), text: v[1], onclick: function () { UI.lv = v[0]; UI.hv = "lv" + v[0]; render(); }})); });
+    root.appendChild(sub);
+    root.appendChild(UI.lv === "status" ? vReport() : vReviewsLive());
+    return root;
+  }
   if (hist.error) { root.appendChild(h("div", {class: "card empty", text: hist.error})); return root; }
   if (!S.archive) { root.appendChild(h("div", {class: "card empty", text: "Loading…"})); return root; }
   root.appendChild(archiveYear(UI.ay));
