@@ -109,7 +109,7 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
 .sec h3{margin-top:0}
 .legend{display:flex;gap:12px;flex-wrap:wrap;font-size:12px;color:var(--muted);align-items:center}
 .flag{display:inline-block;padding:0 6px;border-radius:999px;font-size:11px;font-weight:600;border:1px solid currentColor;margin-left:6px;vertical-align:1px}
-.flag.medium{color:var(--warn)}.flag.low{color:var(--bad)}.flag.high{display:none}
+.flag.medium{color:var(--warn)}.flag.low{color:var(--bad)}.flag.high{display:none}.flag.confirmed{color:var(--ok)}
 .legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:4px;vertical-align:-1px}
 </style>
 </head>
@@ -1002,7 +1002,19 @@ function histPeopleIndex(A) {
   A.funding.forEach(function (r) { get(r.sid, r.name).funding.push(r); });
   return Object.keys(by).map(function (k) { return by[k]; }).sort(function (a, b) { return a.name.localeCompare(b.name); });
 }
-function confFlag(c) { return c && c !== "high" ? h("span", {class: "flag " + c, text: c === "low" ? "unverified" : "unconfirmed", title: c === "low" ? "Weak or ambiguous match — check before using" : "Plausible but not fully confirmed"}) : null; }
+function confFlag(o) {
+  if (!o) return null;
+  if (o.verified) return h("span", {class: "flag confirmed", text: "confirmed", title: "You confirmed this"});
+  var c = o.confidence;
+  return c && c !== "high" ? h("span", {class: "flag " + c, text: c === "low" ? "unverified" : "unconfirmed",
+    title: c === "low" ? "Weak or ambiguous match — check before using" : "Plausible, but identity or currency is not fully confirmed"}) : null;
+}
+function saveOutcome(o) {
+  setSync("Saving…", false);
+  return call("put", {coll: "alumni", obj: o})
+    .then(function (r) { setSync(r && r.ok ? "Saved" : "Could not save.", !(r && r.ok)); })
+    .catch(function () { setSync("Could not save.", true); });
+}
 function outcomeText(o) { return o ? [o.position, o.employer].filter(Boolean).join(", ") : ""; }
 function histPeople(A) {
   var wrap = h("div", {}), list = histPeopleIndex(A);
@@ -1012,7 +1024,7 @@ function histPeople(A) {
     var cur = !!p.sid && S.students.some(function (s) { return s.id === p.sid && s.status === "active"; });
     var yrs = p.records.map(function (r) { return r.year; }).sort().join(", ");
     var oc = h("td", {class: "small"});
-    if (p.outcome && outcomeText(p.outcome)) { oc.appendChild(h("span", {text: outcomeText(p.outcome)})); var fl = confFlag(p.outcome.confidence); if (fl) oc.appendChild(fl); }
+    if (p.outcome && outcomeText(p.outcome)) { oc.appendChild(h("span", {text: outcomeText(p.outcome)})); var fl = confFlag(p.outcome); if (fl) oc.appendChild(fl); }
     else if (!cur) oc.appendChild(h("span", {class: "muted", text: "—"}));
     tb.appendChild(h("tr", {}, h("td", {}, h("button", {class: "link", text: p.name, onclick: function () { personDlg(p); }})), h("td", {}, badge(cur ? "Current" : "Former", cur ? "ok" : "idle")), oc, h("td", {text: yrs || "—"}), h("td", {text: p.funding.map(function (f) { return f.year; }).join(", ") || "—"}), h("td", {text: p.alumni.length ? p.alumni.map(function (a) { return a.asOf.slice(0, 4); }).join(", ") : ""})));
   });
@@ -1026,17 +1038,36 @@ function personDlg(p) {
     if (p.outcome) {
       var o = p.outcome, sec = h("div", {class: "sec"}, h("h3", {text: "Where they are now"}));
       el.appendChild(sec);
-      var line = h("p", {class: "small"}, h("span", {text: outcomeText(o) || "Not found"}));
-      var fl = confFlag(o.confidence); if (fl) line.appendChild(fl);
-      el.appendChild(line);
-      var bits = [];
-      if (o.phd_year) bits.push("PhD " + o.phd_year);
-      if (o.as_of) bits.push("source reflects " + o.as_of);
-      if (bits.length) el.appendChild(h("p", {class: "small muted", text: bits.join(" · ")}));
-      if (o.dissertation) el.appendChild(h("p", {class: "small muted", text: "Dissertation: " + o.dissertation}));
-      if (o.note) el.appendChild(h("p", {class: "small muted", text: o.note}));
-      if (o.url) el.appendChild(h("p", {class: "small"}, h("a", {href: o.url, target: "_blank", rel: "noopener", text: "Source"})));
-      el.appendChild(h("p", {class: "small muted", text: "Found by web search, not confirmed with the person. Correct it in the program records if it is wrong."}));
+      var body = h("div", {});
+      sec.appendChild(body);
+      function draw() {
+        body.textContent = "";
+        if (UI.editOutcome === o.id) {
+          body.appendChild(h("label", {class: "f"}, "Position", h("input", {value: o.position || "", oninput: function (e) { o.position = e.target.value; }})));
+          body.appendChild(h("label", {class: "f"}, "Employer", h("input", {value: o.employer || "", oninput: function (e) { o.employer = e.target.value; }})));
+          body.appendChild(h("label", {class: "f"}, "PhD year", h("input", {value: o.phd_year || "", oninput: function (e) { o.phd_year = e.target.value; }})));
+          body.appendChild(h("label", {class: "f"}, "Your note", h("textarea", {value: o.yourNote || "", oninput: function (e) { o.yourNote = e.target.value; }})));
+          body.appendChild(h("div", {class: "row"},
+            h("button", {class: "btn primary", text: "Save as confirmed", onclick: function () { o.verified = true; o.confidence = "high"; o.as_of = todayStr(); UI.editOutcome = ""; saveOutcome(o); draw(); }}),
+            h("button", {class: "btn", text: "Save", onclick: function () { UI.editOutcome = ""; saveOutcome(o); draw(); }}),
+            h("button", {class: "btn", text: "Cancel", onclick: function () { UI.editOutcome = ""; draw(); }})));
+          return;
+        }
+        var line = h("p", {class: "small"}, h("span", {text: outcomeText(o) || "Not found"}));
+        var fl = confFlag(o); if (fl) line.appendChild(fl);
+        body.appendChild(line);
+        var bits = [];
+        if (o.phd_year) bits.push("PhD " + o.phd_year);
+        if (o.as_of) bits.push(o.verified ? "confirmed " + o.as_of : "source reflects " + o.as_of);
+        if (bits.length) body.appendChild(h("p", {class: "small muted", text: bits.join(" · ")}));
+        if (o.dissertation) body.appendChild(h("p", {class: "small muted", text: "Dissertation: " + o.dissertation}));
+        if (o.yourNote) body.appendChild(h("p", {class: "small", text: o.yourNote}));
+        if (o.note) body.appendChild(h("p", {class: "small muted", text: o.note}));
+        if (o.url) body.appendChild(h("p", {class: "small"}, h("a", {href: o.url, target: "_blank", rel: "noopener", text: "Source"})));
+        if (!o.verified) body.appendChild(h("p", {class: "small muted", text: "Found by web search, not confirmed with the person."}));
+        body.appendChild(h("button", {class: "btn", text: o.verified ? "Edit" : "Correct or confirm", onclick: function () { UI.editOutcome = o.id; draw(); }}));
+      }
+      draw();
     }
     p.alumni.forEach(function (a) {
       el.appendChild(h("div", {class: "sec"}, h("h3", {text: "Milestones snapshot " + a.asOf})));
