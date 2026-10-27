@@ -246,7 +246,7 @@ function loadAll(first) {
 }
 
 /* ---------- shell ---------- */
-var TABS = [["overview", "Overview"], ["tasks", "Tasks"], ["students", "Students"], ["notes", "Notes"], ["report", "Annual report"], ["reviews", "Reviews 25/26"], ["settings", "Settings"]];
+var TABS = [["overview", "Overview"], ["tasks", "Tasks"], ["students", "Students"], ["funding", "Funding 26-27"], ["notes", "Notes"], ["report", "Annual report"], ["reviews", "Reviews 25/26"], ["settings", "Settings"]];
 function render() {
   var openDlg = document.querySelector("dialog[open]");
   if (openDlg) return; // don't clobber an open editor
@@ -259,7 +259,7 @@ function render() {
     nav.appendChild(h("button", {role: "tab", "aria-selected": String(UI.tab === t[0]), text: t[1], onclick: function () { UI.tab = t[0]; render(); }}));
   });
   app.appendChild(nav);
-  var view = {overview: vOverview, tasks: vTasks, students: vStudents, notes: vNotes, report: vReport, reviews: vReviews, settings: vSettings}[UI.tab];
+  var view = {overview: vOverview, tasks: vTasks, students: vStudents, funding: vFunding, notes: vNotes, report: vReport, reviews: vReviews, settings: vSettings}[UI.tab];
   app.appendChild(view());
 }
 
@@ -410,7 +410,13 @@ function studentDlg(s) {
     var status = h("select", {onchange: function (e) { s.status = e.target.value; if (!isNew) save("students", s); }},
       [["active", "Active"], ["leave", "On leave"], ["graduated", "Graduated"]].map(function (o) { return h("option", {value: o[0], text: o[1], selected: s.status === o[0]}); }));
     el.appendChild(h("div", {class: "cols2"}, h("label", {class: "f"}, "Status", status), fld("Last meeting", "lastMeeting", "date")));
-    el.appendChild(fld("Funding (source, end date)", "funding"));
+    el.appendChild(fld("Funding notes (source, end date)", "funding"));
+    var aidBox = h("div", {class: "cols2"});
+    ["fall", "spring"].forEach(function (t) {
+      aidBox.appendChild(h("label", {class: "f"}, (t === "fall" ? "Fall" : "Spring") + " 2026-27 aid", h("input", {list: "aidcodes", value: (s.aid || {})[t] || "", placeholder: "RF, TF…", oninput: function (e) { s.aid = s.aid || {}; s.aid[t] = e.target.value.trim().toUpperCase(); if (!isNew) saveSoon("students", s); }})));
+    });
+    el.appendChild(aidBox);
+    if (!document.getElementById("aidcodes")) document.body.appendChild(h("datalist", {id: "aidcodes"}, h("option", {value: "RF"}), h("option", {value: "TF"})));
     el.appendChild(h("label", {class: "row small muted", style: "margin-bottom:10px"}, h("input", {type: "checkbox", checked: !!s.flag, onchange: function (e) { s.flag = e.target.checked; if (!isNew) save("students", s); }}), "Flag for attention"));
     var sum = h("textarea", {value: s.summary || "", placeholder: "Standing summary: where they are, concerns, next steps", oninput: function (e) { s.summary = e.target.value; if (!isNew) saveSoon("students", s); }});
     el.appendChild(h("label", {class: "f"}, "Summary", sum));
@@ -528,6 +534,44 @@ function vReport() {
   });
   if (!act.length) tb.appendChild(h("tr", {}, h("td", {colspan: "4", class: "empty", text: "No report data yet."})));
   root.appendChild(h("div", {class: "tw"}, h("table", {}, h("thead", {}, h("tr", {}, h("th", {text: "Student"}), h("th", {text: "Advisor"}), h("th", {text: "Student section"}), h("th", {text: "Advisor review"}))), tb)));
+  return root;
+}
+
+/* ---------- funding 26-27 ---------- */
+function vFunding() {
+  var root = h("div", {});
+  var act = S.students.filter(function (st) { return st.status === "active"; });
+  function aid(st, t) { return ((st.aid || {})[t] || "").trim(); }
+  function tally(t) { var o = {}; act.forEach(function (st) { var c = aid(st, t) || "Not listed"; o[c] = (o[c] || 0) + 1; }); return o; }
+  function card(t, label) {
+    var o = tally(t), keys = Object.keys(o).sort(function (a, b) { return a === "Not listed" ? 1 : b === "Not listed" ? -1 : a.localeCompare(b); });
+    return h("div", {class: "card"}, h("h3", {text: label}), h("div", {class: "row"}, keys.map(function (k) {
+      return h("div", {class: "stat", style: "margin-right:18px", text: String(o[k])}, h("small", {text: k}));
+    })));
+  }
+  root.appendChild(h("div", {class: "grid g2", style: "margin-bottom:12px"}, card("fall", "Fall 2026"), card("spring", "Spring 2027")));
+  var tb = h("tbody", {});
+  function cell(st, t) {
+    return h("td", {}, h("input", {list: "aidcodes", value: aid(st, t), style: "width:90px", "aria-label": st.name + " " + t + " aid", placeholder: "—",
+      onchange: function (e) { st.aid = st.aid || {}; st.aid[t] = e.target.value.trim().toUpperCase(); save("students", st); render(); }}));
+  }
+  act.forEach(function (st) {
+    tb.appendChild(h("tr", {}, h("td", {}, h("button", {class: "link", text: st.name, onclick: function () { studentDlg(st); }})), h("td", {text: st.advisor}), cell(st, "fall"), cell(st, "spring"),
+      h("td", {class: "small muted", text: st.funding || ""})));
+  });
+  if (!document.getElementById("aidcodes")) document.body.appendChild(h("datalist", {id: "aidcodes"}, h("option", {value: "RF"}), h("option", {value: "TF"})));
+  root.appendChild(h("div", {class: "tw"}, h("table", {}, h("thead", {}, h("tr", {}, ["Student", "Advisor", "Fall 2026", "Spring 2027", "Other funding notes"].map(function (x) { return h("th", {text: x}); }))), tb)));
+  /* by advisor */
+  var by = {};
+  act.forEach(function (st) { var a = by[st.advisor] = by[st.advisor] || {n: 0, c: {}}; a.n++; ["fall", "spring"].forEach(function (t) { var c = aid(st, t); if (c) a.c[c] = (a.c[c] || 0) + 1; }); });
+  var ab = h("tbody", {});
+  Object.keys(by).sort().forEach(function (k) {
+    var c = by[k].c;
+    ab.appendChild(h("tr", {}, h("td", {text: k}), h("td", {text: String(by[k].n)}), h("td", {text: Object.keys(c).sort().map(function (x) { return c[x] + " " + x; }).join(", ") || "—"})));
+  });
+  root.appendChild(h("h2", {text: "By advisor (semesters of support)", style: "margin-top:20px"}));
+  root.appendChild(h("div", {class: "tw"}, h("table", {}, h("thead", {}, h("tr", {}, h("th", {text: "Advisor"}), h("th", {text: "Students"}), h("th", {text: "Fall + spring semesters"}))), ab)));
+  root.appendChild(h("p", {class: "small muted", text: "Source: BBC Student Funding FY 26-27. Edit any cell to update it. \"Not listed\" means the funding sheet left that semester blank."}));
   return root;
 }
 
