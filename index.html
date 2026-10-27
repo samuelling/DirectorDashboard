@@ -248,7 +248,7 @@ function loadAll(first) {
 }
 
 /* ---------- shell ---------- */
-var TABS = [["overview", "Overview"], ["tasks", "Tasks"], ["students", "Students"], ["funding", "Funding 26-27"], ["notes", "Notes"], ["report", "Annual report"], ["reviews", "Reviews 25/26"], ["history", "History"], ["settings", "Settings"]];
+var TABS = [["overview", "Overview"], ["tasks", "Tasks"], ["students", "Students"], ["funding", "Funding"], ["notes", "Notes"], ["report", "Annual report"], ["reviews", "Reviews 25/26"], ["history", "History"], ["settings", "Settings"]];
 function render() {
   var openDlg = document.querySelector("dialog[open]");
   if (openDlg) return; // don't clobber an open editor
@@ -582,7 +582,7 @@ function vReport() {
 }
 
 /* ---------- funding 26-27 ---------- */
-function vFunding() {
+function vFunding2627() {
   var root = h("div", {});
   var act = S.students.filter(function (st) { return st.status === "active"; });
   function aid(st, t) { return ((st.aid || {})[t] || "").trim(); }
@@ -738,6 +738,32 @@ function qa(label, value) {
   return h("div", {class: "qa"}, h("div", {class: "q", text: label}), h("div", {class: "a" + (has ? "" : " none"), text: has ? value : "Nothing entered"}));
 }
 function listText(v) { return listRows(v).map(function (p) { return "• " + [p.term, p.cite, p.status].filter(Boolean).join(" — "); }).join("\n"); }
+var FY = [["26-27", "FY 26-27"], ["su26", "Summer 2026"], ["ay2425", "AY 24-25"], ["all", "Compare years"]];
+function vFunding() {
+  var root = h("div", {}), bar = h("div", {class: "toolbar"});
+  UI.fy = UI.fy || "26-27";
+  FY.forEach(function (f) { bar.appendChild(h("button", {class: "btn" + (UI.fy === f[0] ? " primary" : ""), text: f[1], onclick: function () { UI.fy = f[0]; UI.hv = "fy" + f[0]; render(); }})); });
+  root.appendChild(bar);
+  if (UI.fy === "26-27") { root.appendChild(vFunding2627()); return root; }
+  if (!S.archive && !hist.loading && !hist.error) loadArchive();
+  if (hist.error) { root.appendChild(h("div", {class: "card empty", text: hist.error})); return root; }
+  if (!S.archive) { root.appendChild(h("div", {class: "card empty", text: "Loading…"})); return root; }
+  var A = S.archive;
+  if (UI.fy === "all") { root.appendChild(histFunding(A)); return root; }
+  var kind = UI.fy === "su26" ? "summer" : "ay", tb = h("tbody", {}), heads;
+  var list = A.funding.filter(function (f) { return f.kind === kind; }).sort(function (a, b) { return a.name.localeCompare(b.name); });
+  list.forEach(function (f) {
+    var nm = f.sid ? h("button", {class: "link", text: f.name, onclick: function () { var p = histPeopleIndex(A).filter(function (x) { return x.sid === f.sid; })[0]; if (p) personDlg(p); }}) : f.name;
+    tb.appendChild(kind === "summer"
+      ? h("tr", {}, h("td", {}, nm), h("td", {text: f.mentor}), h("td", {text: f.yearInProgram}), h("td", {text: f.definite || "None"}), h("td", {text: f.potential || ""}), h("td", {text: f.requested || ""}))
+      : h("tr", {}, h("td", {}, nm), h("td", {text: f.mentor}), h("td", {text: f.entry}), h("td", {text: f.fall || "—"}), h("td", {text: f.spring || "—"}), h("td", {text: f.nextFall || "—"}), h("td", {text: f.nextSpring || "—"}), h("td", {class: "small muted", text: f.note || ""})));
+  });
+  heads = kind === "summer" ? ["Student", "Mentor", "Year in program", "Definite funding", "Potential funding", "Requested from PBS (months)"] : ["Student", "Mentor", "Entered", "Fall 2024", "Spring 2025", "Planned Fall 2025", "Planned Spring 2026", "Notes"];
+  root.appendChild(h("div", {class: "tw"}, h("table", {}, h("thead", {}, h("tr", {}, heads.map(function (x) { return h("th", {text: x}); }))), tb)));
+  root.appendChild(h("p", {class: "small muted", text: kind === "summer" ? "Source: Summer 2026 funding projections (archived)." : "Source: PBS Student Funding AY 24-25 sheet, BBC tab (archived)."}));
+  return root;
+}
+
 /* ---------- history / archive ---------- */
 var hist = {loading: false, error: "", view: "outcomes", q: ""};
 function loadArchive() {
@@ -745,8 +771,8 @@ function loadArchive() {
   return call("archive").then(function (r) {
     hist.loading = false;
     if (r && r.ok) S.archive = r.archive; else hist.error = r && r.error === "unknown action" ? "The backend script needs the latest update." : "Could not load history.";
-    setSync("", false); if (UI.tab === "history") render();
-  }).catch(function () { hist.loading = false; hist.error = "Could not reach the server."; setSync("", false); if (UI.tab === "history") render(); });
+    setSync("", false); if (UI.tab === "history" || UI.tab === "funding") render();
+  }).catch(function () { hist.loading = false; hist.error = "Could not reach the server."; setSync("", false); if (UI.tab === "history" || UI.tab === "funding") render(); });
 }
 function hSlug(x) { return String(x || "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, ""); }
 function pctOf(o) { return o ? o.target + "% / " + o.acceptable + "% / " + o.needs + "%" : "—"; }
@@ -754,7 +780,7 @@ function vHistory() {
   var root = h("div", {});
   if (!S.archive && !hist.loading && !hist.error) loadArchive();
   if (!S.reviews && !revState.loading && !revState.error) loadReviews();
-  var views = [["outcomes", "Program outcomes"], ["people", "People over time"], ["funding", "Funding by year"], ["cohorts", "Earlier cohorts (2018)"]];
+  var views = [["outcomes", "Program outcomes"], ["people", "People over time"], ["cohorts", "Earlier cohorts (2018)"]];
   var bar = h("div", {class: "toolbar"});
   views.forEach(function (v) { bar.appendChild(h("button", {class: "btn" + (hist.view === v[0] ? " primary" : ""), text: v[1], onclick: function () { hist.view = v[0]; UI.hv = v[0]; render(); }})); });
   bar.appendChild(h("span", {class: "grow"}));
@@ -765,8 +791,7 @@ function vHistory() {
   var A = S.archive;
   if (hist.view === "outcomes") root.appendChild(histOutcomes(A));
   else if (hist.view === "people") root.appendChild(histPeople(A));
-  else if (hist.view === "funding") root.appendChild(histFunding(A));
-  else root.appendChild(histCohorts(A));
+    else root.appendChild(histCohorts(A));
   return root;
 }
 function histOutcomes(A) {
