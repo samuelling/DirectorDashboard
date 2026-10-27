@@ -52,8 +52,19 @@ label.f>input,label.f>select,label.f>textarea{display:block;width:100%;margin-to
 .b-idle{background:var(--idle-bg);color:var(--idle)}
 .tw{overflow-x:auto;border:1px solid var(--line);border-radius:10px;background:var(--panel)}
 table{border-collapse:collapse;width:100%}
-th[data-arrow]::after{content:attr(data-arrow);font-size:10px}
-th[aria-sort]:hover{color:var(--ink,#111)}
+th button.sorth{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;cursor:pointer;display:inline-flex;align-items:center;gap:4px;text-align:left}
+th button.sorth:hover{color:var(--ink)}
+th button.sorth .ar{font-size:9px;opacity:.9}
+th[aria-sort="none"] button.sorth .ar{opacity:0}
+th button.sorth:hover .ar{opacity:.5}
+.subtabs{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 14px}
+.subtabs button{font:inherit;background:var(--panel);color:var(--muted);border:1px solid var(--line);border-radius:999px;padding:5px 12px;cursor:pointer;white-space:nowrap}
+.subtabs button:hover{color:var(--ink);border-color:var(--muted)}
+.subtabs button[aria-selected="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:600}
+.subtabs .sep{width:1px;background:var(--line);margin:2px 2px}
+.skip{position:absolute;left:-9999px;top:0;background:var(--panel);color:var(--ink);border:1px solid var(--accent);border-radius:8px;padding:8px 12px;z-index:50}
+.skip:focus{left:8px;top:8px}
+.hint{font-size:12px;color:var(--muted);margin:0 0 12px}
 th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--line);vertical-align:middle}
 th{font-size:12px;color:var(--muted);font-weight:600;white-space:nowrap}
 tr:last-child td{border-bottom:0}
@@ -101,6 +112,7 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
 </style>
 </head>
 <body>
+<a class="skip" href="#main">Skip to content</a>
 <div class="wrap" id="app"></div>
 <script>
 "use strict";
@@ -248,21 +260,61 @@ function loadAll(first) {
 }
 
 /* ---------- shell ---------- */
-var TABS = [["overview", "Overview"], ["tasks", "Tasks"], ["students", "Students"], ["funding", "Funding"], ["notes", "Notes"], ["reviews", "Annual Report"], ["history", "History"], ["settings", "Settings"]];
+var TABS = [
+  ["overview", "Overview"],
+  ["tasks", "Tasks"],
+  ["students", "Students"],
+  ["notes", "Notes"],
+  ["reviews", "Annual Report"],
+  ["funding", "Funding"],
+  ["people", "People"],
+  ["program", "Program"],
+  ["settings", "Settings"]
+];
+var VIEWS = {overview: vOverview, tasks: vTasks, students: vStudents, notes: vNotes, reviews: vReviews, funding: vFunding, people: vPeople, program: vProgram, settings: vSettings};
+
+/* Roving-tabindex keyboard navigation shared by the main tabs and every subtab row. */
+function wireTablist(el) {
+  var btns = Array.prototype.slice.call(el.querySelectorAll("[role=tab]"));
+  btns.forEach(function (b, i) {
+    b.tabIndex = b.getAttribute("aria-selected") === "true" ? 0 : -1;
+    b.addEventListener("keydown", function (e) {
+      var n = {ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1}[e.key];
+      var j = e.key === "Home" ? 0 : e.key === "End" ? btns.length - 1 : n ? (i + n + btns.length) % btns.length : -1;
+      if (j < 0) return;
+      e.preventDefault(); btns[j].focus(); btns[j].click();
+    });
+  });
+}
+
+/* One subtab row, used by Annual Report, Funding and Program so they all behave alike. */
+function subtabs(label, items, current, pick) {
+  var bar = h("div", {class: "subtabs", role: "tablist", "aria-label": label});
+  items.forEach(function (it) {
+    if (it === "|") { bar.appendChild(h("div", {class: "sep", "aria-hidden": "true"})); return; }
+    bar.appendChild(h("button", {role: "tab", "aria-selected": String(current === it[0]), text: it[1],
+      onclick: function () { pick(it[0]); }}));
+  });
+  setTimeout(function () { wireTablist(bar); }, 0);
+  return bar;
+}
+
 function render() {
-  var openDlg = document.querySelector("dialog[open]");
-  if (openDlg) return; // don't clobber an open editor
+  if (document.querySelector("dialog[open]")) return; // don't clobber an open editor
   app.textContent = "";
   app.appendChild(h("header", {class: "top"},
     h("div", {class: "brand"}, "BBC ", h("span", {text: "Director"}), " Dashboard"),
-    h("div", {id: "sync", class: "sync" + (syncBad ? " bad" : ""), text: syncMsg})));
-  var nav = h("nav", {class: "tabs", role: "tablist"});
+    h("div", {id: "sync", class: "sync" + (syncBad ? " bad" : ""), role: "status", "aria-live": "polite", text: syncMsg})));
+  var nav = h("nav", {class: "tabs", role: "tablist", "aria-label": "Dashboard sections"});
   TABS.forEach(function (t) {
-    nav.appendChild(h("button", {role: "tab", "aria-selected": String(UI.tab === t[0]), text: t[1], onclick: function () { UI.tab = t[0]; render(); }}));
+    nav.appendChild(h("button", {role: "tab", id: "tab-" + t[0], "aria-controls": "main", "aria-selected": String(UI.tab === t[0]), text: t[1],
+      onclick: function () { UI.tab = t[0]; render(); var b = document.getElementById("tab-" + t[0]); if (b) b.focus(); }}));
   });
   app.appendChild(nav);
-  var view = {overview: vOverview, tasks: vTasks, students: vStudents, funding: vFunding, notes: vNotes, reviews: vReviews, history: vHistory, settings: vSettings}[UI.tab];
-  app.appendChild(view());
+  wireTablist(nav);
+  var panel = h("main", {id: "main", role: "tabpanel", tabindex: "-1", "aria-labelledby": "tab-" + UI.tab});
+  panel.appendChild((VIEWS[UI.tab] || vOverview)());
+  app.appendChild(panel);
   sortable();
 }
 
@@ -273,9 +325,9 @@ function cellKey(td) {
   return t;
 }
 function sortable() {
-  var tables = app.querySelectorAll("table");
-  Array.prototype.forEach.call(tables, function (tb, ti) {
-    var id = UI.tab + ":" + (UI.hv || "") + ":" + ti, ths = tb.querySelectorAll("thead th"), body = tb.tBodies[0];
+  Array.prototype.forEach.call(app.querySelectorAll("table"), function (tbl, ti) {
+    var id = UI.tab + ":" + (UI.hv || "") + ":" + ti, ths = tbl.querySelectorAll("thead th"), body = tbl.tBodies[0];
+    Array.prototype.forEach.call(ths, function (th) { th.setAttribute("scope", "col"); });
     if (!body || body.rows.length < 2) return;
     function apply(col, dir) {
       var rows = Array.prototype.slice.call(body.rows);
@@ -290,20 +342,30 @@ function sortable() {
       });
       idx.forEach(function (i) { body.appendChild(rows[i]); });
     }
+    function paint(th, dir) {
+      Array.prototype.forEach.call(ths, function (t) {
+        t.setAttribute("aria-sort", "none");
+        var a = t.querySelector(".ar"); if (a) a.textContent = "▲";
+      });
+      if (!th) return;
+      th.setAttribute("aria-sort", dir > 0 ? "ascending" : "descending");
+      var a = th.querySelector(".ar"); if (a) a.textContent = dir > 0 ? "▲" : "▼";
+    }
     Array.prototype.forEach.call(ths, function (th, col) {
-      if (!th.textContent.trim()) return;
-      th.style.cursor = "pointer"; th.title = "Click to sort"; th.setAttribute("aria-sort", "none");
-      var st = UI.sort[id];
-      if (st && st.col === col) { th.setAttribute("aria-sort", st.dir > 0 ? "ascending" : "descending"); th.dataset.arrow = st.dir > 0 ? " ▲" : " ▼"; }
-      th.addEventListener("click", function () {
+      var label = th.textContent.trim();
+      if (!label) return;
+      th.setAttribute("aria-sort", "none");
+      th.textContent = "";
+      var btn = h("button", {class: "sorth", type: "button", title: "Sort by " + label}, label, h("span", {class: "ar", "aria-hidden": "true", text: "▲"}));
+      btn.addEventListener("click", function () {
         var cur = UI.sort[id], dir = cur && cur.col === col ? -cur.dir : 1;
         UI.sort[id] = {col: col, dir: dir};
-        Array.prototype.forEach.call(ths, function (t) { t.setAttribute("aria-sort", "none"); delete t.dataset.arrow; });
-        th.setAttribute("aria-sort", dir > 0 ? "ascending" : "descending"); th.dataset.arrow = dir > 0 ? " ▲" : " ▼";
-        apply(col, dir);
+        paint(th, dir); apply(col, dir);
       });
-      if (st && st.col === col) apply(col, st.dir);
+      th.appendChild(btn);
     });
+    var st = UI.sort[id];
+    if (st && ths[st.col]) { paint(ths[st.col], st.dir); apply(st.col, st.dir); }
   });
 }
 
@@ -370,15 +432,24 @@ function vTasks() {
   return root;
 }
 function dialog(build) {
-  var dlg = h("dialog", {});
+  var prev = document.activeElement;
+  var dlg = h("dialog", {"aria-modal": "true"});
   var inner = h("div", {class: "dlg"});
   dlg.appendChild(inner);
   function close() { dlg.close(); }
   build(inner, close);
-  dlg.addEventListener("close", function () { dlg.remove(); render(); });
+  var head = inner.querySelector("h2");
+  if (head) { head.id = head.id || "dlgh" + uid(); dlg.setAttribute("aria-labelledby", head.id); }
+  dlg.addEventListener("close", function () {
+    dlg.remove(); render();
+    if (prev && document.contains(prev)) prev.focus();
+    else { var m = document.getElementById("main"); if (m) m.focus(); }
+  });
   dlg.addEventListener("click", function (e) { if (e.target === dlg) dlg.close(); });
   document.body.appendChild(dlg);
   dlg.showModal();
+  var first = inner.querySelector("input,select,textarea,button:not(.btn)") || inner.querySelector("button");
+  if (first) try { first.focus(); } catch (e) {}
   return dlg;
 }
 function taskDlg(t, preset) {
@@ -738,35 +809,63 @@ function qa(label, value) {
   return h("div", {class: "qa"}, h("div", {class: "q", text: label}), h("div", {class: "a" + (has ? "" : " none"), text: has ? value : "Nothing entered"}));
 }
 function listText(v) { return listRows(v).map(function (p) { return "• " + [p.term, p.cite, p.status].filter(Boolean).join(" — "); }).join("\n"); }
-var FY = [["26-27", "FY 26-27"], ["su26", "Summer 2026"], ["ay2425", "AY 24-25"], ["jan13", "Jan 2013 snapshot"], ["all", "Compare years"]];
+var FY = [["2026-27", "2026–27", "current"], ["2025-26", "2025–26", "planned"], ["2024-25", "2024–25", ""], ["2007-13", "2007–13", ""], ["all", "All years", ""]];
+function fyLink(A, f) {
+  return f.sid ? h("button", {class: "link", text: niceName(f.name), onclick: function () { var p = histPeopleIndex(A).filter(function (x) { return x.sid === f.sid; })[0]; if (p) personDlg(p); }}) : h("span", {text: niceName(f.name)});
+}
+function fyTable(heads, rows, note) {
+  var tb = h("tbody", {});
+  rows.forEach(function (r) { tb.appendChild(r); });
+  var out = h("div", {}, h("div", {class: "tw"}, h("table", {}, h("thead", {}, h("tr", {}, heads.map(function (x) { return h("th", {text: x}); }))), tb)));
+  if (note) out.appendChild(h("p", {class: "small muted", text: note}));
+  return out;
+}
+function fySection(title, sub) { return h("h3", {text: title, style: "margin:18px 0 6px"}); }
 function vFunding() {
-  var root = h("div", {}), bar = h("div", {class: "toolbar"});
-  UI.fy = UI.fy || "26-27";
-  FY.forEach(function (f) { bar.appendChild(h("button", {class: "btn" + (UI.fy === f[0] ? " primary" : ""), text: f[1], onclick: function () { UI.fy = f[0]; UI.hv = "fy" + f[0]; render(); }})); });
-  root.appendChild(bar);
-  if (UI.fy === "26-27") { root.appendChild(vFunding2627()); return root; }
+  var root = h("div", {});
+  UI.fy = UI.fy || "2026-27";
+  root.appendChild(subtabs("Funding year", FY.map(function (f) { return [f[0], f[1] + (f[2] ? " (" + f[2] + ")" : "")]; }), UI.fy, function (v) { UI.fy = v; UI.hv = "fy" + v; render(); }));
   if (!S.archive && !hist.loading && !hist.error) loadArchive();
-  if (hist.error) { root.appendChild(h("div", {class: "card empty", text: hist.error})); return root; }
-  if (!S.archive) { root.appendChild(h("div", {class: "card empty", text: "Loading…"})); return root; }
+  if (UI.fy === "2026-27") {
+    root.appendChild(h("p", {class: "small muted", style: "margin:0 0 10px", text: "Obligated funding for the coming year. These cells are editable; everything else in this tab is archived."}));
+    root.appendChild(vFunding2627());
+    if (S.archive) {
+      var su = S.archive.funding.filter(function (f) { return f.kind === "summer"; }).sort(function (a, b) { return a.name.localeCompare(b.name); });
+      if (su.length) {
+        root.appendChild(fySection("Summer 2026 (the summer before this year)"));
+        root.appendChild(fyTable(["Student", "Mentor", "Year in program", "Definite funding", "Potential funding", "Requested from PBS (months)"],
+          su.map(function (f) { return h("tr", {}, h("td", {}, fyLink(S.archive, f)), h("td", {text: f.mentor}), h("td", {text: f.yearInProgram}), h("td", {text: f.definite || "None"}), h("td", {text: f.potential || ""}), h("td", {text: f.requested || ""})); }),
+          "Source: 2026 Grad Student Summer Funding Projections."));
+      }
+    }
+    return root;
+  }
+  if (!archiveGuard(root)) return root;
   var A = S.archive;
   if (UI.fy === "all") { root.appendChild(histFunding(A)); return root; }
-  var kind = UI.fy === "su26" ? "summer" : UI.fy === "jan13" ? "jan13" : "ay", tb = h("tbody", {}), heads;
+  var ay = A.funding.filter(function (f) { return f.kind === "ay"; }).sort(function (a, b) { return a.name.localeCompare(b.name); });
+  if (UI.fy === "2025-26") {
+    root.appendChild(h("p", {class: "small muted", style: "margin:0 0 10px", text: "What was projected for 2025–26 when the AY 24-25 sheet was last revised. No sheet of actuals for this year is on file."}));
+    root.appendChild(fyTable(["Student", "Mentor", "Entered", "Fall 2025", "Spring 2026", "Notes"],
+      ay.map(function (f) { return h("tr", {}, h("td", {}, fyLink(A, f)), h("td", {text: f.mentor}), h("td", {text: f.entry}), h("td", {text: f.nextFall || "—"}), h("td", {text: f.nextSpring || "—"}), h("td", {class: "small muted", text: f.note || ""})); }),
+      "Source: PBS Student Funding AY 24-25 sheet, BBC tab (the projected-next-year columns)."));
+    return root;
+  }
+  if (UI.fy === "2024-25") {
+    root.appendChild(fyTable(["Student", "Mentor", "Entered", "Fall 2024", "Spring 2025", "Notes"],
+      ay.map(function (f) { return h("tr", {}, h("td", {}, fyLink(A, f)), h("td", {text: f.mentor}), h("td", {text: f.entry}), h("td", {text: f.fall || "—"}), h("td", {text: f.spring || "—"}), h("td", {class: "small muted", text: f.note || ""})); }),
+      "Source: PBS Student Funding AY 24-25 sheet, BBC tab."));
+    return root;
+  }
   var Y13 = ["2007-08", "2008-09", "2009-10", "2010-11", "2011-12", "2012-13"];
-  var list = A.funding.filter(function (f) { return f.kind === kind; }).sort(function (a, b) { return a.name.localeCompare(b.name); });
-  list.forEach(function (f) {
-    var nm = f.sid ? h("button", {class: "link", text: f.name, onclick: function () { var p = histPeopleIndex(A).filter(function (x) { return x.sid === f.sid; })[0]; if (p) personDlg(p); }}) : f.name;
-    if (kind === "jan13") {
-      var tr = h("tr", {}, h("td", {text: niceName(f.name)}), h("td", {text: f.group}), h("td", {text: f.mentor}), h("td", {text: f.program}), h("td", {text: f.entry}));
+  var j13 = A.funding.filter(function (f) { return f.kind === "jan13"; }).sort(function (a, b) { return a.group.localeCompare(b.group) || a.name.localeCompare(b.name); });
+  root.appendChild(fyTable(["Student", "Support type", "Mentor", "Program", "Entered"].concat(Y13),
+    j13.map(function (f) {
+      var tr = h("tr", {}, h("td", {}, fyLink(A, f)), h("td", {text: f.group}), h("td", {text: f.mentor}), h("td", {text: f.program}), h("td", {text: f.entry}));
       Y13.forEach(function (y) { tr.appendChild(h("td", {text: f.support[y] && f.support[y] !== "N/A" ? f.support[y] : "—"})); });
-      tb.appendChild(tr); return;
-    }
-    tb.appendChild(kind === "summer"
-      ? h("tr", {}, h("td", {}, nm), h("td", {text: f.mentor}), h("td", {text: f.yearInProgram}), h("td", {text: f.definite || "None"}), h("td", {text: f.potential || ""}), h("td", {text: f.requested || ""}))
-      : h("tr", {}, h("td", {}, nm), h("td", {text: f.mentor}), h("td", {text: f.entry}), h("td", {text: f.fall || "—"}), h("td", {text: f.spring || "—"}), h("td", {text: f.nextFall || "—"}), h("td", {text: f.nextSpring || "—"}), h("td", {class: "small muted", text: f.note || ""})));
-  });
-  heads = kind === "jan13" ? ["Student", "Support type", "Mentor", "Program", "Entered"].concat(Y13) : kind === "summer" ? ["Student", "Mentor", "Year in program", "Definite funding", "Potential funding", "Requested from PBS (months)"] : ["Student", "Mentor", "Entered", "Fall 2024", "Spring 2025", "Planned Fall 2025", "Planned Spring 2026", "Notes"];
-  root.appendChild(h("div", {class: "tw"}, h("table", {}, h("thead", {}, h("tr", {}, heads.map(function (x) { return h("th", {text: x}); }))), tb)));
-  root.appendChild(h("p", {class: "small muted", text: kind === "jan13" ? "Source: BBC and GPN student support, Jan 2013 (from Chantal Stern). Year columns are inferred as AY 2007-08 through 2012-13; the source has no header row." : kind === "summer" ? "Source: Summer 2026 funding projections (archived)." : "Source: PBS Student Funding AY 24-25 sheet, BBC tab (archived)."}));
+      return tr;
+    }),
+    "Source: BBC and GPN student support, Jan 2013 (from Chantal Stern). Year columns are inferred as AY 2007-08 through 2012-13; the source has no header row."));
   return root;
 }
 
@@ -778,21 +877,17 @@ function reviewYears() {
   return Object.keys(ys).sort().reverse();
 }
 function vReviews() {
-  var root = h("div", {}), bar = h("div", {class: "toolbar"});
+  var root = h("div", {});
   UI.ay = UI.ay || "2025-26";
   if (!S.archive && !hist.loading && !hist.error) loadArchive();
-  reviewYears().forEach(function (y) { bar.appendChild(h("button", {class: "btn" + (UI.ay === y ? " primary" : ""), text: y.replace(/^(\d{4})-(\d\d)$/, "$1–$2") + (y === "2025-26" ? " (live)" : ""), onclick: function () { UI.ay = y; UI.hv = "ar" + y; render(); }})); });
-  root.appendChild(bar);
+  root.appendChild(subtabs("Report year", reviewYears().map(function (y) { return [y, y.replace(/^(\d{4})-(\d\d)$/, "$1–$2") + (y === "2025-26" ? " (current)" : "")]; }), UI.ay, function (v) { UI.ay = v; UI.hv = "ar" + v; render(); }));
   if (UI.ay === "2025-26") {
     UI.lv = UI.lv || "status";
-    var sub = h("div", {class: "toolbar"});
-    [["status", "Submission status"], ["results", "Results and reviews"]].forEach(function (v) { sub.appendChild(h("button", {class: "btn" + (UI.lv === v[0] ? " primary" : ""), text: v[1], onclick: function () { UI.lv = v[0]; UI.hv = "lv" + v[0]; render(); }})); });
-    root.appendChild(sub);
+    root.appendChild(subtabs("Current cycle view", [["status", "Submission status"], ["results", "Results and reviews"]], UI.lv, function (v) { UI.lv = v; UI.hv = "lv" + v; render(); }));
     root.appendChild(UI.lv === "status" ? vReport() : vReviewsLive());
     return root;
   }
-  if (hist.error) { root.appendChild(h("div", {class: "card empty", text: hist.error})); return root; }
-  if (!S.archive) { root.appendChild(h("div", {class: "card empty", text: "Loading…"})); return root; }
+  if (!archiveGuard(root)) return root;
   root.appendChild(archiveYear(UI.ay));
   return root;
 }
@@ -823,32 +918,41 @@ function archiveYear(ay) {
 /* ---------- history / archive ---------- */
 var hist = {loading: false, error: "", view: "outcomes", q: ""};
 function loadArchive() {
-  hist.loading = true; hist.error = ""; setSync("Loading history…", false);
+  hist.loading = true; hist.error = ""; setSync("Loading archive…", false);
   return call("archive").then(function (r) {
     hist.loading = false;
-    if (r && r.ok) S.archive = r.archive; else hist.error = r && r.error === "unknown action" ? "The backend script needs the latest update." : "Could not load history.";
-    setSync("", false); if (UI.tab === "history" || UI.tab === "funding" || UI.tab === "reviews") render();
-  }).catch(function () { hist.loading = false; hist.error = "Could not reach the server."; setSync("", false); if (UI.tab === "history" || UI.tab === "funding" || UI.tab === "reviews") render(); });
+    if (r && r.ok) S.archive = r.archive; else hist.error = r && r.error === "unknown action" ? "The backend script needs the latest update." : "Could not load the archive.";
+    setSync("", false); if (["people", "program", "funding", "reviews"].indexOf(UI.tab) >= 0) render();
+  }).catch(function () { hist.loading = false; hist.error = "Could not reach the server."; setSync("", false); if (["people", "program", "funding", "reviews"].indexOf(UI.tab) >= 0) render(); });
 }
 function hSlug(x) { return String(x || "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, ""); }
 function pctOf(o) { return o ? o.target + "% / " + o.acceptable + "% / " + o.needs + "%" : "—"; }
-function vHistory() {
-  var root = h("div", {});
+/* Guard shared by every archive-backed view: load once, show one clear state. */
+function archiveGuard(root) {
   if (!S.archive && !hist.loading && !hist.error) loadArchive();
+  if (hist.error) { root.appendChild(h("div", {class: "card empty"}, h("p", {text: hist.error}), h("button", {class: "btn", text: "Try again", onclick: function () { hist.error = ""; loadArchive(); render(); }}))); return false; }
+  if (!S.archive) { root.appendChild(h("div", {class: "card empty", text: "Loading the archive…"})); return false; }
+  return true;
+}
+
+/* ---------- people: everyone, current and former, across every record ---------- */
+function vPeople() {
+  var root = h("div", {});
+  root.appendChild(h("p", {class: "hint", text: "Everyone the program has a record of. Click a name for their progress reports, funding and milestones in one place."}));
+  if (!archiveGuard(root)) return root;
+  root.appendChild(histPeople(S.archive));
+  return root;
+}
+
+/* ---------- program: how the program itself has done over time ---------- */
+function vProgram() {
+  var root = h("div", {});
+  var views = [["outcomes", "Learning outcomes by cycle"], ["cohorts", "Earlier cohorts"], ["docs", "Program documents"]];
+  root.appendChild(subtabs("Program history", views, hist.view === "people" ? "outcomes" : hist.view, function (v) { hist.view = v; UI.hv = v; render(); }));
+  if (!archiveGuard(root)) return root;
   if (!S.reviews && !revState.loading && !revState.error) loadReviews();
-  var views = [["outcomes", "Program outcomes"], ["people", "People over time"], ["cohorts", "Earlier cohorts (2017–18)"], ["docs", "Program documents"]];
-  var bar = h("div", {class: "toolbar"});
-  views.forEach(function (v) { bar.appendChild(h("button", {class: "btn" + (hist.view === v[0] ? " primary" : ""), text: v[1], onclick: function () { hist.view = v[0]; UI.hv = v[0]; render(); }})); });
-  bar.appendChild(h("span", {class: "grow"}));
-  bar.appendChild(h("button", {class: "btn", text: hist.loading ? "Loading…" : "Refresh", onclick: loadArchive}));
-  root.appendChild(bar);
-  if (hist.error) { root.appendChild(h("div", {class: "card empty", text: hist.error})); return root; }
-  if (!S.archive) { root.appendChild(h("div", {class: "card empty", text: "Loading history…"})); return root; }
   var A = S.archive;
-  if (hist.view === "outcomes") root.appendChild(histOutcomes(A));
-  else if (hist.view === "people") root.appendChild(histPeople(A));
-    else if (hist.view === "docs") root.appendChild(histDocs(A));
-  else root.appendChild(histCohorts(A));
+  root.appendChild(hist.view === "cohorts" ? histCohorts(A) : hist.view === "docs" ? histDocs(A) : histOutcomes(A));
   return root;
 }
 function histOutcomes(A) {
@@ -898,12 +1002,12 @@ function histPeopleIndex(A) {
 }
 function histPeople(A) {
   var wrap = h("div", {}), list = histPeopleIndex(A);
-  wrap.appendChild(h("div", {class: "toolbar"}, h("input", {type: "search", placeholder: "Search by name…", value: hist.q, "aria-label": "Search people", style: "max-width:260px", oninput: function (e) { hist.q = e.target.value; var pos = e.target.selectionStart; render(); var i = document.querySelector("input[type=search]"); if (i) { i.focus(); i.setSelectionRange(pos, pos); } }})));
+  wrap.appendChild(h("div", {class: "toolbar"}, h("label", {class: "small muted", for: "psearch", text: "Find a person"}), h("input", {id: "psearch", type: "search", placeholder: "Name…", value: hist.q, "aria-label": "Find a person", style: "max-width:260px", oninput: function (e) { hist.q = e.target.value; var pos = e.target.selectionStart; render(); var i = document.getElementById("psearch"); if (i) { i.focus(); i.setSelectionRange(pos, pos); } }})));
   var tb = h("tbody", {}), q = hist.q.toLowerCase();
   list.filter(function (p) { return !q || p.name.toLowerCase().indexOf(q) >= 0; }).forEach(function (p) {
     var cur = !!p.sid && S.students.some(function (s) { return s.id === p.sid && s.status === "active"; });
     var yrs = p.records.map(function (r) { return r.year; }).sort().join(", ");
-    tb.appendChild(h("tr", {}, h("td", {}, h("button", {class: "link", text: p.name, onclick: function () { personDlg(p); }})), h("td", {text: cur ? "Current" : "Former / earlier"}), h("td", {text: yrs || "—"}), h("td", {text: p.funding.map(function (f) { return f.year; }).join(", ") || "—"}), h("td", {text: p.alumni.length ? p.alumni.map(function (a) { return a.asOf.slice(0, 4); }).join(", ") : ""})));
+    tb.appendChild(h("tr", {}, h("td", {}, h("button", {class: "link", text: p.name, onclick: function () { personDlg(p); }})), h("td", {}, badge(cur ? "Current" : "Former", cur ? "ok" : "idle")), h("td", {text: yrs || "—"}), h("td", {text: p.funding.map(function (f) { return f.year; }).join(", ") || "—"}), h("td", {text: p.alumni.length ? p.alumni.map(function (a) { return a.asOf.slice(0, 4); }).join(", ") : ""})));
   });
   wrap.appendChild(h("div", {class: "tw"}, h("table", {}, h("thead", {}, h("tr", {}, ["Name", "Status", "Progress reports", "Funding records", "Milestone reports"].map(function (x) { return h("th", {text: x}); }))), tb)));
   return wrap;
@@ -941,7 +1045,7 @@ function histFunding(A) {
     var ay = r.ay, su = r.su, c = r.cur;
     tb.appendChild(h("tr", {}, h("td", {text: r.name}), h("td", {text: ay ? (ay.fall || "—") + " / " + (ay.spring || "—") : "—"}), h("td", {text: ay ? (ay.nextFall || "—") + " / " + (ay.nextSpring || "—") : "—"}), h("td", {class: "small", text: su ? (su.definite || "None") + (su.potential ? " (potential: " + su.potential + ")" : "") : "—"}), h("td", {text: c && c.aid ? (c.aid.fall || "—") + " / " + (c.aid.spring || "—") : "—"}), h("td", {class: "small muted", text: ay && ay.note || ""})));
   });
-  wrap.appendChild(h("div", {class: "tw"}, h("table", {}, h("thead", {}, h("tr", {}, ["Name", "AY 24-25 (F / S)", "Planned for 25-26 (F / S)", "Summer 2026", "FY 26-27 (F / S)", "Notes"].map(function (x) { return h("th", {text: x}); }))), tb)));
+  wrap.appendChild(h("div", {class: "tw"}, h("table", {}, h("thead", {}, h("tr", {}, ["Name", "2024–25 (F / S)", "2025–26 planned (F / S)", "Summer 2026", "2026–27 (F / S)", "Notes"].map(function (x) { return h("th", {text: x}); }))), tb)));
   wrap.appendChild(h("p", {class: "small muted", text: "Sources: PBS AY 24-25 funding sheet (BBC tab), Summer 2026 projections, and the FY 26-27 obligated funding sheet."}));
   return wrap;
 }
