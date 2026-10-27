@@ -248,7 +248,7 @@ function loadAll(first) {
 }
 
 /* ---------- shell ---------- */
-var TABS = [["overview", "Overview"], ["tasks", "Tasks"], ["students", "Students"], ["funding", "Funding"], ["notes", "Notes"], ["report", "Annual report"], ["reviews", "Reviews 25/26"], ["history", "History"], ["settings", "Settings"]];
+var TABS = [["overview", "Overview"], ["tasks", "Tasks"], ["students", "Students"], ["funding", "Funding"], ["notes", "Notes"], ["report", "Annual report"], ["reviews", "Annual Reviews"], ["history", "History"], ["settings", "Settings"]];
 function render() {
   var openDlg = document.querySelector("dialog[open]");
   if (openDlg) return; // don't clobber an open editor
@@ -662,7 +662,7 @@ function goalStats(rows, n) {
   var t = d[3] + d[4], a = d[2], nn = d[1];
   return {n: vals.length, mean: vals.length ? vals.reduce(function (x, y) { return x + y; }, 0) / vals.length : null, d: d, t: t, a: a, nn: nn};
 }
-function vReviews() {
+function vReviewsLive() {
   var root = h("div", {});
   if (!S.reviews && !revState.loading && !revState.error) loadReviews();
   var rows = S.reviews ? revData() : [];
@@ -770,6 +770,49 @@ function vFunding() {
   return root;
 }
 
+/* ---------- annual reviews: one subtab per year ---------- */
+function reviewYears() {
+  var ys = {"2025-26": 1};
+  if (S.archive) { S.archive.records.forEach(function (r) { ys[r.year] = 1; }); S.archive.history.forEach(function (c) { if (c.ay) ys[c.ay] = 1; }); }
+  else ["2024-25", "2023-24", "2022-23", "2011-12"].forEach(function (y) { ys[y] = 1; });
+  return Object.keys(ys).sort().reverse();
+}
+function vReviews() {
+  var root = h("div", {}), bar = h("div", {class: "toolbar"});
+  UI.ay = UI.ay || "2025-26";
+  if (!S.archive && !hist.loading && !hist.error) loadArchive();
+  reviewYears().forEach(function (y) { bar.appendChild(h("button", {class: "btn" + (UI.ay === y ? " primary" : ""), text: y.replace(/^(\d{4})-(\d\d)$/, "$1–$2") + (y === "2025-26" ? " (live)" : ""), onclick: function () { UI.ay = y; UI.hv = "ar" + y; render(); }})); });
+  root.appendChild(bar);
+  if (UI.ay === "2025-26") { root.appendChild(vReviewsLive()); return root; }
+  if (hist.error) { root.appendChild(h("div", {class: "card empty", text: hist.error})); return root; }
+  if (!S.archive) { root.appendChild(h("div", {class: "card empty", text: "Loading…"})); return root; }
+  root.appendChild(archiveYear(UI.ay));
+  return root;
+}
+function archiveYear(ay) {
+  var A = S.archive, wrap = h("div", {});
+  var cyc = A.history.filter(function (c) { return c.ay === ay; })[0];
+  if (cyc) {
+    var card = h("div", {class: "card", style: "margin-bottom:12px"}, h("h3", {text: "Program annual report · cycle " + cyc.cycle + " (" + cyc.period + ")"}), h("p", {class: "small", text: cyc.note || ""}));
+    if (!cyc.missing) {
+      var rows = [];
+      [1, 2, 3].forEach(function (n) { var g = cyc["g" + n]; if (g) rows.push(REV_GOALS[n - 1][1] + ": mean " + g.mean.toFixed(1) + " · Target " + g.target + "% / Acceptable " + g.acceptable + "% / Needs improvement " + g.needs + "%"); });
+      if (cyc.g4) rows.push("Goal 4 teaching: Fall " + cyc.g4.fall.n + " TFs (" + cyc.g4.fall.target + " Target, " + cyc.g4.fall.acceptable + " Acceptable) · Spring " + cyc.g4.spring.n + " TFs (" + cyc.g4.spring.target + " Target, " + cyc.g4.spring.acceptable + " Acceptable)");
+      rows.forEach(function (x) { card.appendChild(h("p", {class: "small", text: x})); });
+      if (cyc.text) card.appendChild(h("details", {}, h("summary", {text: "Full text of the submitted report" + (cyc.file ? " (" + cyc.file + ")" : "")}), h("pre", {class: "small", style: "white-space:pre-wrap;font-family:inherit", text: cyc.text})));
+    }
+    wrap.appendChild(card);
+  } else wrap.appendChild(h("div", {class: "card", style: "margin-bottom:12px"}, h("p", {class: "small muted", text: "No program-level annual report is on file for this year."})));
+  var recs = A.records.filter(function (r) { return r.year === ay; }).sort(function (a, b) { return a.name.localeCompare(b.name); }), tb = h("tbody", {});
+  recs.forEach(function (r) {
+    tb.appendChild(h("tr", {}, h("td", {}, h("button", {class: "link", text: r.name, onclick: function () { personDlg({name: r.name, records: [r], funding: [], alumni: []}); }})), h("td", {text: r.advisor || "—"}), h("td", {text: r.entry || "—"}), h("td", {text: r.qual || "—"}), h("td", {text: r.prospectus || "—"}), h("td", {text: (r.sid && S.students.some(function (s) { return s.id === r.sid && s.status === "active"; })) ? "Current" : "Former"})));
+  });
+  wrap.appendChild(h("h3", {text: "Student progress reports (" + recs.length + ")", style: "margin:6px 0"}));
+  if (!recs.length) wrap.appendChild(h("div", {class: "card empty", text: "No student reports from this year are on file."}));
+  else wrap.appendChild(h("div", {class: "tw"}, h("table", {}, h("thead", {}, h("tr", {}, ["Student", "Major professor", "Entered", "Qualifying exam", "Prospectus", "Status"].map(function (x) { return h("th", {text: x}); }))), tb)));
+  return wrap;
+}
+
 /* ---------- history / archive ---------- */
 var hist = {loading: false, error: "", view: "outcomes", q: ""};
 function loadArchive() {
@@ -777,8 +820,8 @@ function loadArchive() {
   return call("archive").then(function (r) {
     hist.loading = false;
     if (r && r.ok) S.archive = r.archive; else hist.error = r && r.error === "unknown action" ? "The backend script needs the latest update." : "Could not load history.";
-    setSync("", false); if (UI.tab === "history" || UI.tab === "funding") render();
-  }).catch(function () { hist.loading = false; hist.error = "Could not reach the server."; setSync("", false); if (UI.tab === "history" || UI.tab === "funding") render(); });
+    setSync("", false); if (UI.tab === "history" || UI.tab === "funding" || UI.tab === "reviews") render();
+  }).catch(function () { hist.loading = false; hist.error = "Could not reach the server."; setSync("", false); if (UI.tab === "history" || UI.tab === "funding" || UI.tab === "reviews") render(); });
 }
 function hSlug(x) { return String(x || "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, ""); }
 function pctOf(o) { return o ? o.target + "% / " + o.acceptable + "% / " + o.needs + "%" : "—"; }
