@@ -156,6 +156,19 @@ function fmtDate(s) {
   if (isNaN(d)) return s;
   return d.toLocaleDateString(undefined, {month: "short", day: "numeric", year: d.getFullYear() === new Date().getFullYear() ? undefined : "numeric"});
 }
+function ayStart(d) { d = d || new Date(); return d.getMonth() >= 6 ? d.getFullYear() : d.getFullYear() - 1; }
+function ayLabel() { var a = ayStart(); return a + "–" + String(a + 1).slice(2); }
+/* Year in the program, counted from the entry academic year. Year 1 is the year they arrived. */
+function progYear(st) {
+  var m = /(\d{4})/.exec(st && st.cohort || "");
+  if (!m) return null;
+  var y = ayStart() - Number(m[1]) + 1;
+  return y >= 1 && y < 15 ? y : null;
+}
+function yearCell(st) {
+  var y = progYear(st);
+  return h("td", {class: y == null ? "muted" : "", text: y == null ? "—" : String(y), title: y == null ? "Set the entry year on the student" : "Entered " + st.cohort});
+}
 function studentById(id) { return S.students.filter(function (s) { return s.id === id; })[0]; }
 function badge(text, kind) { return h("span", {class: "badge b-" + kind, text: text}); }
 function copy(text, msg) {
@@ -487,7 +500,7 @@ function vStudents() {
     [["active", "Active"], ["leave", "On leave"], ["graduated", "Graduated"], ["all", "All"]].map(function (o) { return h("option", {value: o[0], text: o[1], selected: UI.sf === o[0]}); }));
   root.appendChild(h("div", {class: "toolbar"}, q, sf, h("span", {class: "grow"}), h("button", {class: "btn primary", text: "+ Add student", onclick: function () { studentDlg(null); }})));
   var ms = msList();
-  var thead = h("tr", {}, h("th", {text: "Student"}), h("th", {text: "Advisor"}), h("th", {text: "Milestones"}), h("th", {text: "Progress"}), h("th", {text: "Last meeting"}));
+  var thead = h("tr", {}, h("th", {text: "Student"}), h("th", {text: "Advisor"}), h("th", {text: "Year"}), h("th", {text: "Milestones"}), h("th", {text: "Progress"}), h("th", {text: "Last meeting"}));
   var tbody = h("tbody", {});
   root.appendChild(h("div", {class: "tw"}, h("table", {}, h("thead", {}, thead), tbody)));
   function drawRows() {
@@ -496,12 +509,13 @@ function vStudents() {
     var list = S.students.filter(function (s) {
       return (UI.sf === "all" || s.status === UI.sf) && (!needle || (s.name + " " + s.advisor).toLowerCase().indexOf(needle) >= 0);
     });
-    if (!list.length) tbody.appendChild(h("tr", {}, h("td", {colspan: "5", class: "empty", text: "No students match."})));
+    if (!list.length) tbody.appendChild(h("tr", {}, h("td", {colspan: "6", class: "empty", text: "No students match."})));
     list.forEach(function (s) {
       var p = progress(s);
       tbody.appendChild(h("tr", {class: "click", tabindex: "0", onclick: function () { studentDlg(s); }, onkeydown: function (e) { if (e.key === "Enter") studentDlg(s); }},
-        h("td", {}, h("b", {text: s.name}), s.flag ? " " : "", s.flag ? badge("Flag", "bad") : "", s.cohort ? h("div", {class: "small muted", text: "Cohort " + s.cohort}) : ""),
+        h("td", {}, h("b", {text: s.name}), s.flag ? " " : "", s.flag ? badge("Flag", "bad") : "", s.cohort ? h("div", {class: "small muted", text: "Entered " + s.cohort}) : ""),
         h("td", {text: s.advisor}),
+        yearCell(s),
         h("td", {}, h("div", {class: "dots", title: ms.map(function (m) { return m.label + ": " + msState(s, m.k); }).join("\n")}, ms.map(function (m) { return h("span", {class: "dot " + msState(s, m.k)}); }))),
         h("td", {}, h("div", {class: "row"}, h("div", {class: "bar", style: "width:70px"}, h("i", {style: "width:" + p + "%"})), h("span", {class: "small", text: p + "%"}))),
         h("td", {class: "small muted", text: s.lastMeeting ? fmtDate(s.lastMeeting) : "—"})));
@@ -522,7 +536,7 @@ function studentDlg(s) {
     }
     el.appendChild(h("div", {class: "row sp"}, h("h2", {text: isNew ? "Add student" : s.name}), h("button", {class: "btn", text: "Close", onclick: close})));
     if (isNew) el.appendChild(fld("Name", "name"));
-    el.appendChild(h("div", {class: "cols2"}, fld("Advisor", "advisor"), fld("Cohort (entry year)", "cohort")));
+    el.appendChild(h("div", {class: "cols2"}, fld("Advisor", "advisor"), fld("Entry academic year (e.g. 2023-2024)", "cohort")));
     el.appendChild(h("div", {class: "cols2"}, fld("Student email", "email", "email"), fld("Advisor email", "advisorEmail", "email")));
     var status = h("select", {onchange: function (e) { s.status = e.target.value; if (!isNew) save("students", s); }},
       [["active", "Active"], ["leave", "On leave"], ["graduated", "Graduated"]].map(function (o) { return h("option", {value: o[0], text: o[1], selected: s.status === o[0]}); }));
@@ -673,11 +687,11 @@ function vFunding2627() {
       onchange: function (e) { st.aid = st.aid || {}; st.aid[t] = e.target.value.trim().toUpperCase(); save("students", st); render(); }}));
   }
   act.forEach(function (st) {
-    tb.appendChild(h("tr", {}, h("td", {}, h("button", {class: "link", text: st.name, onclick: function () { studentDlg(st); }})), h("td", {text: st.advisor}), cell(st, "fall"), cell(st, "spring"),
+    tb.appendChild(h("tr", {}, h("td", {}, h("button", {class: "link", text: st.name, onclick: function () { studentDlg(st); }})), h("td", {text: st.advisor}), yearCell(st), cell(st, "fall"), cell(st, "spring"),
       h("td", {class: "small muted", text: st.funding || ""})));
   });
   if (!document.getElementById("aidcodes")) document.body.appendChild(h("datalist", {id: "aidcodes"}, h("option", {value: "RF"}), h("option", {value: "TF"})));
-  root.appendChild(h("div", {class: "tw"}, h("table", {}, h("thead", {}, h("tr", {}, ["Student", "Advisor", "Fall 2026", "Spring 2027", "Other funding notes"].map(function (x) { return h("th", {text: x}); }))), tb)));
+  root.appendChild(h("div", {class: "tw"}, h("table", {}, h("thead", {}, h("tr", {}, ["Student", "Advisor", "Year", "Fall 2026", "Spring 2027", "Other funding notes"].map(function (x) { return h("th", {text: x}); }))), tb)));
   /* by advisor */
   var by = {};
   act.forEach(function (st) { var a = by[st.advisor] = by[st.advisor] || {n: 0, c: {}}; a.n++; ["fall", "spring"].forEach(function (t) { var c = aid(st, t); if (c) a.c[c] = (a.c[c] || 0) + 1; }); });
@@ -940,7 +954,7 @@ function archiveGuard(root) {
 /* ---------- people: everyone, current and former, across every record ---------- */
 function vPeople() {
   var root = h("div", {});
-  root.appendChild(h("p", {class: "hint", text: "Everyone the program has a record of. Click a name for their progress reports, funding and milestones in one place."}));
+  root.appendChild(h("p", {class: "hint", text: "Everyone the program has a record of. Click a name for their progress reports, funding and milestones in one place. Years in the program are counted for " + ayLabel() + "."}));
   if (!archiveGuard(root)) return root;
   root.appendChild(histPeople(S.archive));
   return root;
@@ -1018,15 +1032,28 @@ function saveOutcome(o) {
 function outcomeText(o) { return o ? [o.position, o.employer].filter(Boolean).join(", ") : ""; }
 function histPeople(A) {
   var wrap = h("div", {}), list = histPeopleIndex(A);
+  UI.pf = UI.pf || "all";
+  var needs = list.filter(function (p) { return p.outcome && p.outcome.review && !p.outcome.verified; }).length;
+  wrap.appendChild(subtabs("Filter people", [["all", "Everyone (" + list.length + ")"], ["current", "Current students"], ["former", "Former"], ["check", "Needs checking (" + needs + ")"]], UI.pf, function (v) { UI.pf = v; UI.hv = "pf" + v; render(); }));
   wrap.appendChild(h("div", {class: "toolbar"}, h("label", {class: "small muted", for: "psearch", text: "Find a person"}), h("input", {id: "psearch", type: "search", placeholder: "Name…", value: hist.q, "aria-label": "Find a person", style: "max-width:260px", oninput: function (e) { hist.q = e.target.value; var pos = e.target.selectionStart; render(); var i = document.getElementById("psearch"); if (i) { i.focus(); i.setSelectionRange(pos, pos); } }})));
   var tb = h("tbody", {}), q = hist.q.toLowerCase();
-  list.filter(function (p) { return !q || p.name.toLowerCase().indexOf(q) >= 0; }).forEach(function (p) {
+  var shown = list.filter(function (p) {
+    if (q && p.name.toLowerCase().indexOf(q) < 0) return false;
+    var isCur = !!p.sid && S.students.some(function (s) { return s.id === p.sid && s.status === "active"; });
+    if (UI.pf === "current") return isCur;
+    if (UI.pf === "former") return !isCur;
+    if (UI.pf === "check") return !!(p.outcome && p.outcome.review && !p.outcome.verified);
+    return true;
+  });
+  shown.forEach(function (p) {
     var cur = !!p.sid && S.students.some(function (s) { return s.id === p.sid && s.status === "active"; });
     var yrs = p.records.map(function (r) { return r.year; }).sort().join(", ");
     var oc = h("td", {class: "small"});
     if (p.outcome && outcomeText(p.outcome)) { oc.appendChild(h("span", {text: outcomeText(p.outcome)})); var fl = confFlag(p.outcome); if (fl) oc.appendChild(fl); }
+    else if (p.outcome && p.outcome.review) oc.appendChild(h("span", {class: "muted", text: "Not found"}));
     else if (!cur) oc.appendChild(h("span", {class: "muted", text: "—"}));
-    tb.appendChild(h("tr", {}, h("td", {}, h("button", {class: "link", text: p.name, onclick: function () { personDlg(p); }})), h("td", {}, badge(cur ? "Current" : "Former", cur ? "ok" : "idle")), oc, h("td", {text: yrs || "—"}), h("td", {text: p.funding.map(function (f) { return f.year; }).join(", ") || "—"}), h("td", {text: p.alumni.length ? p.alumni.map(function (a) { return a.asOf.slice(0, 4); }).join(", ") : ""})));
+    if (UI.pf === "check" && p.outcome && p.outcome.review) oc.appendChild(h("div", {class: "small muted", style: "margin-top:3px", text: p.outcome.review}));
+    tb.appendChild(h("tr", {}, h("td", {}, h("button", {class: "link", text: p.name, onclick: function () { personDlg(p); }})), h("td", {}, badge(cur ? "Current" : "Former", cur ? "ok" : "idle"), (function () { if (!cur) return ""; var st = studentById(p.sid), y = st && progYear(st); return y ? h("div", {class: "small muted", text: "Year " + y}) : ""; })()), oc, h("td", {text: yrs || "—"}), h("td", {text: p.funding.map(function (f) { return f.year; }).join(", ") || "—"}), h("td", {text: p.alumni.length ? p.alumni.map(function (a) { return a.asOf.slice(0, 4); }).join(", ") : ""})));
   });
   wrap.appendChild(h("div", {class: "tw"}, h("table", {}, h("thead", {}, h("tr", {}, ["Name", "Status", "Where they are now", "Progress reports", "Funding records", "Milestone reports"].map(function (x) { return h("th", {text: x}); }))), tb)));
   return wrap;
@@ -1048,7 +1075,7 @@ function personDlg(p) {
           body.appendChild(h("label", {class: "f"}, "PhD year", h("input", {value: o.phd_year || "", oninput: function (e) { o.phd_year = e.target.value; }})));
           body.appendChild(h("label", {class: "f"}, "Your note", h("textarea", {value: o.yourNote || "", oninput: function (e) { o.yourNote = e.target.value; }})));
           body.appendChild(h("div", {class: "row"},
-            h("button", {class: "btn primary", text: "Save as confirmed", onclick: function () { o.verified = true; o.confidence = "high"; o.as_of = todayStr(); UI.editOutcome = ""; saveOutcome(o); draw(); }}),
+            h("button", {class: "btn primary", text: "Save as confirmed", onclick: function () { o.verified = true; o.confidence = "high"; o.as_of = todayStr(); o.review = ""; UI.editOutcome = ""; saveOutcome(o); draw(); }}),
             h("button", {class: "btn", text: "Save", onclick: function () { UI.editOutcome = ""; saveOutcome(o); draw(); }}),
             h("button", {class: "btn", text: "Cancel", onclick: function () { UI.editOutcome = ""; draw(); }})));
           return;
@@ -1062,6 +1089,7 @@ function personDlg(p) {
         if (bits.length) body.appendChild(h("p", {class: "small muted", text: bits.join(" · ")}));
         if (o.dissertation) body.appendChild(h("p", {class: "small muted", text: "Dissertation: " + o.dissertation}));
         if (o.yourNote) body.appendChild(h("p", {class: "small", text: o.yourNote}));
+        if (o.review) body.appendChild(h("p", {class: "small", style: "border-left:3px solid var(--warn);padding-left:8px", text: "Worth checking: " + o.review}));
         if (o.note) body.appendChild(h("p", {class: "small muted", text: o.note}));
         if (o.url) body.appendChild(h("p", {class: "small"}, h("a", {href: o.url, target: "_blank", rel: "noopener", text: "Source"})));
         if (!o.verified) body.appendChild(h("p", {class: "small muted", text: "Found by web search, not confirmed with the person."}));
