@@ -52,6 +52,7 @@ header.top{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:22px 
 body[data-branch="lab"]{--accent:#1d5f73;--accent2:#49a3a8;--accent-soft:#e0f0f2}
 body[data-branch="lab"][data-tab="lgrants"]{--accent:#8a5a12;--accent2:#c69340;--accent-soft:#faeed8}
 body[data-branch="lab"][data-tab="lirb"]{--accent:#7a3b86;--accent2:#b06ab0;--accent-soft:#f2e7f4}
+body[data-branch="lab"][data-tab="lsheets"]{--accent:#1d5f73;--accent2:#49a3a8;--accent-soft:#e0f0f2}
 body[data-branch="lab"][data-tab="lrecipes"]{--accent:#1f5f52;--accent2:#4d9c7a;--accent-soft:#e2f0ea}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
  body[data-branch="lab"]{--accent:#6cc3d8;--accent2:#9ad9df;--accent-soft:#17303a}}}
@@ -506,7 +507,7 @@ function loadAll(first) {
 var BRANCHES = [["lab", "Lab"], ["dir", "Director"]];
 var TABSETS = {
   dir: [["overview", "Overview"], ["people", "People"], ["reviews", "Annual Report"], ["funding", "Funding"], ["program", "Program"], ["tools", "Tools"]],
-  lab: [["lhome", "Overview"], ["lpeople", "Lab"], ["lgrants", "Grants"], ["lirb", "Compliance"], ["ladmin", "Admin"], ["lrecipes", "Shortcuts"]]
+  lab: [["lhome", "Overview"], ["lpeople", "Lab"], ["lgrants", "Grants"], ["lirb", "Compliance"], ["ladmin", "Admin"], ["lsheets", "Sheets"], ["lrecipes", "Shortcuts"]]
 };
 function branch() { return UI.branch === "lab" ? "lab" : "dir"; }
 function TABSET() { return TABSETS[branch()]; }
@@ -529,7 +530,8 @@ function setBranch(b) {
   render();
 }
 var VIEWS = {overview: vHome, reviews: vReviews, funding: vFunding, people: vPeople, program: vProgram, tools: vTools,
-  lhome: vLabHome, lpeople: vLabPeople, lgrants: vGrants, lirb: vCompliance, ladmin: vAdmin, lrecipes: vRecipes};
+  lhome: vLabHome, lpeople: vLabPeople, lgrants: vGrants, lirb: vCompliance, ladmin: vAdmin, lrecipes: vRecipes,
+  lsheets: function () { return vSheets("lab"); }};
 
 /* Roving-tabindex keyboard navigation shared by the main tabs and every subtab row. */
 function wireTablist(el) {
@@ -668,6 +670,91 @@ function sortable() {
   });
 }
 
+/* ---------- linked sheets: read any link-shared Google Sheet live ----------
+   Shared by both branches; each row is tagged with the branch that owns it. */
+function sheetRows(br) { return S.archive ? S.archive.history.filter(function (x) { return x.kind === "sheet" && (x.branch || "dir") === br; }).sort(function (a, b) { return (a.ord || 0) - (b.ord || 0); }) : []; }
+function sheetIdOf(url) { var m = /\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/.exec(String(url || "")); return m ? m[1] : ""; }
+function sheetGid(url) { var m = /[#&?]gid=(\d+)/.exec(String(url || "")); return m ? m[1] : ""; }
+function sheetCsvUrl(sh) {
+  var id = sheetIdOf(sh.url); if (!id) return "";
+  var gid = sh.gid || sheetGid(sh.url);
+  return "https://docs.google.com/spreadsheets/d/" + id + "/export?format=csv" + (gid ? "&gid=" + gid : "");
+}
+var sheetCache = {};
+function sheetLoad(sh, force) {
+  var k = sh.id, u = sheetCsvUrl(sh);
+  if (!u) return Promise.resolve(null);
+  if (sheetCache[k] && sheetCache[k].state === "ok" && !force) return Promise.resolve(sheetCache[k]);
+  sheetCache[k] = {state: "loading"};
+  return fetch(u, {cache: "no-store"}).then(function (r) {
+    if (!r.ok) throw new Error(String(r.status));
+    return r.text();
+  }).then(function (t) {
+    var rows = csvRows(t).filter(function (r) { return r.some(function (c) { return String(c).trim() !== ""; }); });
+    sheetCache[k] = {state: "ok", rows: rows, at: new Date()};
+    render(); return sheetCache[k];
+  }).catch(function (e) {
+    sheetCache[k] = {state: "err", err: String(e).indexOf("401") >= 0 || String(e).indexOf("403") >= 0 ? "Not shared by link." : "Could not read it."};
+    render(); return sheetCache[k];
+  });
+}
+function sheetDlg(sh, br) {
+  var isNew = !sh;
+  sh = sh || {id: "sheet-" + uid(), kind: "sheet", branch: br, label: "", url: "", gid: "", note: "", headerRow: 1, preview: 12, ord: 99};
+  dialog(function (el, close) {
+    el.appendChild(h("div", {class: "row sp"}, h("h2", {text: isNew ? "Link a sheet" : sh.label || "Linked sheet"}), h("button", {class: "btn", text: "Close", onclick: close})));
+    el.appendChild(h("p", {class: "small muted", text: "Paste the sheet's URL. It has to be shared so that anyone with the link can view, otherwise the page cannot read it."}));
+    el.appendChild(h("label", {class: "f"}, "Name", h("input", {value: sh.label || "", placeholder: "e.g. Scanner schedule", onchange: function (e) { sh.label = e.target.value; }})));
+    el.appendChild(h("label", {class: "f"}, "Sheet URL", h("input", {value: sh.url || "", placeholder: "https://docs.google.com/spreadsheets/d/…", onchange: function (e) { sh.url = e.target.value.trim(); }})));
+    el.appendChild(h("div", {class: "cols2"},
+      h("label", {class: "f"}, "Rows to preview", h("input", {type: "number", min: "3", max: "60", value: String(sh.preview || 12), onchange: function (e) { sh.preview = Math.max(3, Math.min(60, Number(e.target.value) || 12)); }})),
+      h("label", {class: "f"}, "Header row", h("input", {type: "number", min: "0", max: "20", value: String(sh.headerRow == null ? 1 : sh.headerRow), onchange: function (e) { sh.headerRow = Math.max(0, Number(e.target.value) || 0); }}))));
+    el.appendChild(h("label", {class: "f"}, "Note", h("input", {value: sh.note || "", placeholder: "what this is for", onchange: function (e) { sh.note = e.target.value; }})));
+    el.appendChild(h("div", {class: "row"},
+      h("button", {class: "btn primary", text: isNew ? "Link it" : "Save", onclick: function () {
+        if (!sheetIdOf(sh.url)) { setSync("That does not look like a Google Sheet URL.", true); return; }
+        sh.branch = br; delete sheetCache[sh.id];
+        saveLab(sh).then(function () { close(); sheetLoad(sh, true); });
+      }}),
+      isNew ? "" : h("button", {class: "btn", text: "Unlink", onclick: function () { delLab(sh); delete sheetCache[sh.id]; close(); }})));
+  });
+}
+function vSheets(br) {
+  var root = h("div", {});
+  root.appendChild(h("p", {class: "hint", text: "Sheets you keep elsewhere, read straight from Google each time this page loads. Nothing is copied into the dashboard, so what you see is whatever the sheet says right now."}));
+  if (!archiveGuard(root)) return root;
+  root.appendChild(h("div", {class: "toolbar"}, h("span", {class: "grow"}),
+    h("button", {class: "btn primary", text: "+ Link a sheet", onclick: function () { sheetDlg(null, br); }})));
+  var list = sheetRows(br);
+  if (!list.length) { root.appendChild(h("div", {class: "card empty", text: "No sheets linked yet. Paste one in and it shows up live."})); return root; }
+  list.forEach(function (sh) {
+    var c = sheetCache[sh.id];
+    if (!c) { sheetLoad(sh, false); c = sheetCache[sh.id]; }
+    var card = h("div", {class: "card", style: "margin-bottom:14px"});
+    card.appendChild(h("div", {class: "row sp"}, h("h3", {text: sh.label || "Untitled sheet", style: "margin:0"}),
+      h("span", {class: "row"},
+        h("a", {class: "small", href: sh.url, target: "_blank", rel: "noopener", text: "Open"}),
+        h("button", {class: "link small", text: "Refresh", onclick: function () { sheetLoad(sh, true); }}),
+        h("button", {class: "link small", text: "Edit", onclick: function () { sheetDlg(sh, br); }}))));
+    if (sh.note) card.appendChild(h("p", {class: "small muted", style: "margin:4px 0 8px", text: sh.note}));
+    if (!c || c.state === "loading") { card.appendChild(h("div", {class: "empty", text: "Reading…"})); root.appendChild(card); return; }
+    if (c.state === "err") { card.appendChild(h("div", {class: "empty", text: c.err + " Check that it is shared so anyone with the link can view."})); root.appendChild(card); return; }
+    var rows = c.rows, hr = sh.headerRow == null ? 1 : sh.headerRow;
+    var head = hr > 0 && rows[hr - 1] ? rows[hr - 1] : null;
+    var body = rows.slice(hr > 0 ? hr : 0);
+    var show = body.slice(Math.max(0, body.length - (sh.preview || 12)));
+    var wide = Math.min(10, Math.max.apply(null, rows.slice(0, 40).map(function (r) { return r.length; })));
+    var tb = h("tbody", {});
+    show.forEach(function (r) { tb.appendChild(h("tr", {}, Array.from({length: wide}).map(function (_, i) { return h("td", {class: "small", text: String(r[i] == null ? "" : r[i]).slice(0, 90)}); }))); });
+    var thead = head ? h("thead", {}, h("tr", {}, Array.from({length: wide}).map(function (_, i) { return h("th", {text: String(head[i] == null ? "" : head[i]).slice(0, 40)}); }))) : "";
+    card.appendChild(h("div", {class: "tw"}, h("table", {}, thead, tb)));
+    card.appendChild(h("p", {class: "small muted", style: "margin-top:8px",
+      text: body.length + " rows · showing the last " + show.length + " · read " + (c.at ? c.at.toLocaleTimeString() : "just now")}));
+    root.appendChild(card);
+  });
+  return root;
+}
+
 /* ================= LAB BRANCH — SELF-CONTAINED =================
    Everything between this banner and "END LAB BRANCH" is the lab half.
    To hand the director side to someone else: delete this block, drop the
@@ -675,7 +762,7 @@ function sortable() {
    Lab records live in the archive's history collection under kind "lab",
    so no backend change was needed. type tells them apart. */
 var LAB_KINDS = ["lab", "recipe", "cash"];
-function isLabRow(x) { return x.branch === "lab" || LAB_KINDS.indexOf(x.kind) >= 0; }
+function isLabRow(x) { return x.branch === "lab" || (!x.branch && LAB_KINDS.indexOf(x.kind) >= 0); }
 function labRows(type) {
   if (!S.archive) return [];
   return S.archive.history.filter(function (x) { return isLabRow(x) && (x.kind === "lab" || (type === "cash" && x.kind === "cash")) && (!type || x.type === type); });
@@ -685,7 +772,7 @@ function labTasks() { return S.tasks.filter(function (t) { return t.branch === "
 function dirTasks() { return S.tasks.filter(function (t) { return t.branch !== "lab"; }); }
 function saveLab(o) {
   o.kind = o.kind || "lab";
-  o.branch = "lab";
+  if (!o.branch) o.branch = "lab";
   if (!o.id) o.id = "lab-" + uid();
   if (S.archive) {
     var i = -1;
@@ -1970,10 +2057,11 @@ function hlight(txt, q, tag) {
 function vTools() {
   var root = h("div", {});
   UI.tv = UI.tv || "handbook";
-  root.appendChild(subtabs("Tools", [["handbook", "Student handbook"], ["program", "Program reference"], ["links", "Links"], ["sources", "Source data"], ["handoff", "Handoff"], ["settings", "Settings"]], UI.tv, function (v) { UI.tv = v; UI.hv = "tv" + v; render(); }));
+  root.appendChild(subtabs("Tools", [["handbook", "Student handbook"], ["program", "Program reference"], ["links", "Links"], ["sheets", "Sheets"], ["sources", "Source data"], ["handoff", "Handoff"], ["settings", "Settings"]], UI.tv, function (v) { UI.tv = v; UI.hv = "tv" + v; render(); }));
   if (UI.tv === "settings") { root.appendChild(vSettings()); return root; }
   if (UI.tv === "links") { root.appendChild(vLinks()); return root; }
   if (UI.tv === "handoff") { root.appendChild(vHandoff()); return root; }
+  if (UI.tv === "sheets") { root.appendChild(vSheets("dir")); return root; }
   if (!archiveGuard(root)) return root;
   root.appendChild(UI.tv === "sources" ? vSources() : UI.tv === "program" ? vProgRef() : vHandbook());
   return root;
@@ -2114,8 +2202,8 @@ function loadArchive() {
   return call("archive").then(function (r) {
     hist.loading = false;
     if (r && r.ok) S.archive = r.archive; else hist.error = r && r.error === "unknown action" ? "The backend script needs the latest update." : "Could not load the archive.";
-    setSync("", false); if (["people", "program", "funding", "reviews", "tools", "lhome", "lpeople", "lgrants", "lirb", "ladmin", "lrecipes"].indexOf(UI.tab) >= 0) render();
-  }).catch(function () { hist.loading = false; hist.error = "Could not reach the server."; setSync("", false); if (["people", "program", "funding", "reviews", "tools", "lhome", "lpeople", "lgrants", "lirb", "ladmin", "lrecipes"].indexOf(UI.tab) >= 0) render(); });
+    setSync("", false); if (["people", "program", "funding", "reviews", "tools", "lhome", "lpeople", "lgrants", "lirb", "ladmin", "lrecipes", "lsheets"].indexOf(UI.tab) >= 0) render();
+  }).catch(function () { hist.loading = false; hist.error = "Could not reach the server."; setSync("", false); if (["people", "program", "funding", "reviews", "tools", "lhome", "lpeople", "lgrants", "lirb", "ladmin", "lrecipes", "lsheets"].indexOf(UI.tab) >= 0) render(); });
 }
 function hSlug(x) { return String(x || "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, ""); }
 function pctOf(o) { return o ? o.target + "% / " + o.acceptable + "% / " + o.needs + "%" : "—"; }
