@@ -37,6 +37,21 @@ It has two halves, switched at the top of the page: **Lab** and **Director**. Th
 | **Admin** | Lab chores, plus the subject payment cash box |
 | **Shortcuts** | Editable recipes for the recurring nonsense, each with steps, links and a prompt to hand to Claude |
 
+## Hiding rows and columns
+
+Every table carries a **Hide rows or columns** control above it. In hiding mode each row
+gets a checkbox and each column header gets one; unticking either takes it out of view.
+Clicking anywhere on a row toggles it, so you don't have to aim at the box.
+
+A hide is a **view preference, never a delete**. Nothing leaves the store, and the bar above
+the table always says how many rows or columns are hidden with a one-click "show them".
+Hides are saved to the backend as a single `prefs` row per branch (`prefs-dir`, `prefs-lab`)
+in the `history` collection, keyed by table and tagged with `branch`, so they follow you
+across devices and split with the two halves like everything else.
+
+Rows are keyed by the text of their first column, so a hide survives sorting and filtering
+but not a rename of that first field — rename a student and their row reappears.
+
 ## Separating the two halves
 
 The point is that the director half can be handed to the next program director without dragging the lab half along, and vice versa.

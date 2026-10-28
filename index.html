@@ -111,6 +111,16 @@ label.f>input,label.f>select,label.f>textarea{display:block;width:100%;margin-to
 .b-warn{background:var(--warn-bg);color:var(--warn)}
 .b-bad{background:var(--bad-bg);color:var(--bad)}
 .b-idle{background:var(--idle-bg);color:var(--idle)}
+.tbar{display:flex;gap:12px;align-items:center;margin:0 0 6px;flex-wrap:wrap}
+.hidecell{width:30px;text-align:center;padding-left:10px;padding-right:0}
+.hidecell input{width:16px;height:16px}
+th.hidehead{white-space:normal}
+th.hidehead input{width:15px;height:15px;margin-right:6px;vertical-align:-2px}
+table.hiding tbody tr{cursor:pointer}
+table.hiding tbody tr:hover{background:var(--accent-soft)}
+td.colhidden,th.colhidden{display:none}
+tr.ishidden{opacity:.42}
+tr.ishidden td{text-decoration:line-through;text-decoration-color:var(--line2)}
 .tw{overflow-x:auto;border:1px solid var(--line);border-radius:var(--r);background:var(--panel);box-shadow:var(--shadow)}
 table{border-collapse:collapse;width:100%}
 th button.sorth{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;cursor:pointer;display:inline-flex;align-items:center;gap:4px;text-align:left;box-shadow:none}
@@ -496,6 +506,7 @@ function loadAll(first) {
     S.config = r.data.config || {milestones: []}; S.report = r.report || {}; UI.sheetId = r.sheetId || "";
     S.students.sort(function (a, b) { return a.name.localeCompare(b.name); });
     render();
+    if (first && !S.archive && !hist.loading) loadArchive();
   }).catch(function () {
     if (!first) { setSync("Could not refresh.", true); return; }
     app.textContent = "";
@@ -619,6 +630,120 @@ function render() {
   sortable();
 }
 
+/* ---------- hiding rows and columns ----------
+   A hide is a view preference, never a delete: the row stays in the store and
+   can be brought back from "show hidden" on the same table. */
+var prefsCache = {dir: null, lab: null};
+function prefsRow() {
+  var br = branch();
+  if (prefsCache[br]) return prefsCache[br];
+  if (!S.archive) return {id: "prefs-" + br, kind: "prefs", branch: br, rows: {}, cols: {}};
+  var found = S.archive.history.filter(function (x) { return x.kind === "prefs" && (x.branch || "dir") === br; })[0];
+  prefsCache[br] = found || {id: "prefs-" + br, kind: "prefs", branch: br, rows: {}, cols: {}};
+  return prefsCache[br];
+}
+var prefsTimer = null;
+function savePrefs() {
+  var p = prefsRow();
+  clearTimeout(prefsTimer);
+  prefsTimer = setTimeout(function () {
+    if (S.archive) {
+      var i = -1;
+      S.archive.history.forEach(function (x, n) { if (x.id === p.id) i = n; });
+      if (i < 0) S.archive.history.push(p); else S.archive.history[i] = p;
+    }
+    call("put", {coll: "history", obj: p}).catch(function () {});
+  }, 600);
+}
+function hiddenRows(id) { var p = prefsRow(); return (p.rows && p.rows[id]) || []; }
+function hiddenCols(id) { var p = prefsRow(); return (p.cols && p.cols[id]) || []; }
+function toggleHidden(kind, id, key, on) {
+  var p = prefsRow(); p[kind] = p[kind] || {};
+  var list = p[kind][id] || [];
+  var i = list.indexOf(key);
+  if (on && i < 0) list.push(key);
+  if (!on && i >= 0) list.splice(i, 1);
+  p[kind][id] = list; savePrefs();
+}
+var hideMode = {};
+function rowKey(tr) {
+  var c = tr.cells[0];
+  var t = c ? (c.querySelector("input,select") ? c.querySelector("input,select").value : c.textContent) : "";
+  return String(t || "").trim().slice(0, 80);
+}
+function tableTools(tbl, id) {
+  var ths = Array.prototype.slice.call(tbl.querySelectorAll("thead th"));
+  var body = tbl.tBodies[0];
+  if (!body) return;
+  var hr = hiddenRows(id), hc = hiddenCols(id), on = !!hideMode[id];
+  var heads = ths.map(function (t) { return t.textContent.trim(); });
+  /* apply column hiding */
+  ths.forEach(function (th, i) { if (hc.indexOf(heads[i]) >= 0) th.style.display = "none"; });
+  Array.prototype.forEach.call(body.rows, function (tr) {
+    Array.prototype.forEach.call(tr.cells, function (td, i) { if (hc.indexOf(heads[i]) >= 0) td.style.display = "none"; });
+  });
+  /* apply row hiding */
+  var nHidden = 0;
+  Array.prototype.forEach.call(body.rows, function (tr) {
+    var k = rowKey(tr);
+    if (hr.indexOf(k) >= 0) { nHidden++; if (!on) tr.style.display = "none"; else tr.classList.add("ishidden"); }
+  });
+  /* the control strip above the table */
+  var wrap = tbl.closest(".tw") || tbl;
+  var bar = h("div", {class: "tbar"});
+  bar.appendChild(h("button", {class: "link small", text: on ? "Done hiding" : "Hide rows or columns",
+    onclick: function () { hideMode[id] = !on; render(); }}));
+  var tally = h("span", {class: "small muted", text: nHidden ? nHidden + " hidden" : ""});
+  bar.appendChild(tally);
+  if (nHidden && !on) bar.appendChild(h("button", {class: "link small", text: "show them",
+    onclick: function () { var p = prefsRow(); p.rows[id] = []; savePrefs(); render(); }}));
+  if (hc.length && !on) bar.appendChild(h("button", {class: "link small", text: hc.length + " column" + (hc.length > 1 ? "s" : "") + " hidden — show",
+    onclick: function () { var p = prefsRow(); p.cols[id] = []; savePrefs(); render(); }}));
+  wrap.parentNode.insertBefore(bar, wrap);
+  if (!on) return;
+  /* checkbox column + per-column checkboxes, only while hiding */
+  var th0 = h("th", {class: "hidecell", title: "Untick to hide"});
+  ths[0] && ths[0].parentNode.insertBefore(th0, ths[0]);
+  ths.forEach(function (th, i) {
+    if (!heads[i]) return;
+    var cb = h("input", {type: "checkbox", checked: hc.indexOf(heads[i]) < 0, "aria-label": "Show column " + heads[i],
+      onclick: function (e) { e.stopPropagation(); },
+      onchange: function (e) {
+        var off = !e.target.checked;
+        toggleHidden("cols", id, heads[i], off);
+        th.classList.toggle("colhidden", off);
+        Array.prototype.forEach.call(body.rows, function (tr) {
+          var td = tr.cells[i + 1]; /* +1 for the checkbox column */
+          if (td) td.classList.toggle("colhidden", off);
+        });
+      }});
+    th.insertBefore(cb, th.firstChild);
+    th.classList.add("hidehead");
+  });
+  tbl.addEventListener("click", function (e) {
+    if (e.target.type === "checkbox") return;
+    var tr = e.target.closest("tr");
+    if (!tr || tr.parentNode !== body) return;
+    e.preventDefault(); e.stopPropagation();
+    var box = tr.querySelector("td.hidecell input");
+    if (box) { box.checked = !box.checked; box.dispatchEvent(new Event("change")); }
+  }, true);
+  tbl.classList.add("hiding");
+  Array.prototype.forEach.call(body.rows, function (tr) {
+    var k = rowKey(tr);
+    var td = h("td", {class: "hidecell"}, h("input", {type: "checkbox", checked: hr.indexOf(k) < 0, "aria-label": "Show this row",
+      onclick: function (e) { e.stopPropagation(); },
+      onchange: function (e) {
+        var off = !e.target.checked;
+        toggleHidden("rows", id, k, off);
+        tr.classList.toggle("ishidden", off);
+        nHidden += off ? 1 : -1;
+        tally.textContent = nHidden ? nHidden + " hidden" : "";
+      }}));
+    tr.insertBefore(td, tr.cells[0]);
+  });
+}
+
 /* ---------- click-to-sort for every table ---------- */
 UI.sort = UI.sort || {};
 function cellKey(td) {
@@ -628,6 +753,7 @@ function cellKey(td) {
 function sortable() {
   Array.prototype.forEach.call(app.querySelectorAll("table"), function (tbl, ti) {
     var id = UI.tab + ":" + (UI.hv || "") + ":" + ti, ths = tbl.querySelectorAll("thead th"), body = tbl.tBodies[0];
+    try { tableTools(tbl, id); } catch (e) {}
     Array.prototype.forEach.call(ths, function (th) { th.setAttribute("scope", "col"); });
     if (!body || body.rows.length < 2) return;
     function apply(col, dir) {
@@ -652,6 +778,7 @@ function sortable() {
       th.setAttribute("aria-sort", dir > 0 ? "ascending" : "descending");
       var a = th.querySelector(".ar"); if (a) a.textContent = dir > 0 ? "▲" : "▼";
     }
+    if (hideMode[id]) return;
     Array.prototype.forEach.call(ths, function (th, col) {
       var label = th.textContent.trim();
       if (!label) return;
@@ -666,7 +793,7 @@ function sortable() {
       th.appendChild(btn);
     });
     var st = UI.sort[id];
-    if (st && ths[st.col]) { paint(ths[st.col], st.dir); apply(st.col, st.dir); }
+    if (st && ths[st.col] && !hideMode[id]) { paint(ths[st.col], st.dir); apply(st.col, st.dir); }
   });
 }
 
@@ -2201,8 +2328,8 @@ function loadArchive() {
   hist.loading = true; hist.error = ""; setSync("Loading archive…", false);
   return call("archive").then(function (r) {
     hist.loading = false;
-    if (r && r.ok) S.archive = r.archive; else hist.error = r && r.error === "unknown action" ? "The backend script needs the latest update." : "Could not load the archive.";
-    setSync("", false); if (["people", "program", "funding", "reviews", "tools", "lhome", "lpeople", "lgrants", "lirb", "ladmin", "lrecipes", "lsheets"].indexOf(UI.tab) >= 0) render();
+    if (r && r.ok) { S.archive = r.archive; prefsCache = {dir: null, lab: null}; } else hist.error = r && r.error === "unknown action" ? "The backend script needs the latest update." : "Could not load the archive.";
+    setSync("", false); render();
   }).catch(function () { hist.loading = false; hist.error = "Could not reach the server."; setSync("", false); if (["people", "program", "funding", "reviews", "tools", "lhome", "lpeople", "lgrants", "lirb", "ladmin", "lrecipes", "lsheets"].indexOf(UI.tab) >= 0) render(); });
 }
 function hSlug(x) { return String(x || "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, ""); }
