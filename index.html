@@ -5,6 +5,9 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="robots" content="noindex,nofollow">
 <title>BBC Director Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
 :root{
  --bg:#f7f4ef;--bg2:#efe9e0;--panel:#fffdfa;--panel2:#faf6f0;
@@ -13,26 +16,30 @@
  --ok:#2d6a4a;--ok-bg:#e2f0e6;--warn:#8a6210;--warn-bg:#fbefd4;--bad:#a3231b;--bad-bg:#fae6e3;--idle:#857c70;--idle-bg:#eee8e0;
  --shadow:0 1px 2px rgba(60,45,30,.07),0 4px 14px -6px rgba(60,45,30,.10);
  --shadow2:0 2px 6px rgba(60,45,30,.10),0 10px 26px -10px rgba(60,45,30,.18);
- --r:12px}
+ --r:14px;
+ --display:"Fraunces",ui-serif,Georgia,"Iowan Old Style",serif;
+ --sans:"Inter",ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+ --ink3:#5c5449}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
  --bg:#17161a;--bg2:#121114;--panel:#211f24;--panel2:#272429;
  --ink:#f2eee9;--ink2:#ddd6cd;--muted:#a49a8e;--line:#36323a;--line2:#474150;
  --accent:#ef6a5c;--accent2:#e09a5f;--accent-ink:#1a1419;--accent-soft:#36242a;
  --ok:#71c793;--ok-bg:#1b3328;--warn:#e2b45c;--warn-bg:#3a2d14;--bad:#f3897e;--bad-bg:#3e2020;--idle:#978d81;--idle-bg:#2d2a30;
- --shadow:0 1px 2px rgba(0,0,0,.4);--shadow2:0 6px 22px -8px rgba(0,0,0,.6)}}
-:root[data-theme="dark"]{--bg:#17161a;--bg2:#121114;--panel:#211f24;--panel2:#272429;--ink:#f2eee9;--ink2:#ddd6cd;--muted:#a49a8e;--line:#36323a;--line2:#474150;--accent:#ef6a5c;--accent2:#e09a5f;--accent-ink:#1a1419;--accent-soft:#36242a;--ok:#71c793;--ok-bg:#1b3328;--warn:#e2b45c;--warn-bg:#3a2d14;--bad:#f3897e;--bad-bg:#3e2020;--idle:#978d81;--idle-bg:#2d2a30;--shadow:0 1px 2px rgba(0,0,0,.4);--shadow2:0 6px 22px -8px rgba(0,0,0,.6)}
+ --shadow:0 1px 2px rgba(0,0,0,.4);--shadow2:0 6px 22px -8px rgba(0,0,0,.6);--ink3:#b9b0a5}}
+:root[data-theme="dark"]{--bg:#17161a;--bg2:#121114;--panel:#211f24;--panel2:#272429;--ink:#f2eee9;--ink2:#ddd6cd;--muted:#a49a8e;--line:#36323a;--line2:#474150;--accent:#ef6a5c;--accent2:#e09a5f;--accent-ink:#1a1419;--accent-soft:#36242a;--ok:#71c793;--ok-bg:#1b3328;--warn:#e2b45c;--warn-bg:#3a2d14;--bad:#f3897e;--bad-bg:#3e2020;--idle:#978d81;--idle-bg:#2d2a30;--shadow:0 1px 2px rgba(0,0,0,.4);--shadow2:0 6px 22px -8px rgba(0,0,0,.6);--ink3:#b9b0a5}
 *{box-sizing:border-box}
 html{-webkit-text-size-adjust:100%}
-body{margin:0;color:var(--ink);font:15px/1.5 ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+body{margin:0;color:var(--ink);font:15px/1.58 var(--sans);
  background:
-  radial-gradient(1100px 500px at 8% -8%,var(--accent-soft) 0%,transparent 62%),
-  radial-gradient(900px 480px at 100% 0%,var(--bg2) 0%,transparent 60%),
+  radial-gradient(1200px 560px at 6% -10%,var(--accent-soft) 0%,transparent 60%),
+  radial-gradient(1000px 520px at 102% 2%,color-mix(in srgb,var(--accent2) 16%,transparent) 0%,transparent 58%),
+  radial-gradient(700px 400px at 50% 102%,var(--bg2) 0%,transparent 62%),
   var(--bg);
  background-attachment:fixed;min-height:100vh}
 .wrap{max-width:1180px;margin:0 auto;padding:0 18px 72px}
 header.top{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:22px 0 12px}
-.brand{font-weight:700;font-size:19px;letter-spacing:-.015em;display:flex;align-items:center;gap:9px}
-.brand .mark{width:26px;height:26px;border-radius:8px;flex:none;
+.brand{font-family:var(--display);font-weight:600;font-size:23px;letter-spacing:-.01em;display:flex;align-items:center;gap:10px}
+.brand .mark{width:30px;height:30px;border-radius:50% 50% 50% 8px;flex:none;rotate:-8deg;
  background:linear-gradient(145deg,var(--accent) 0%,var(--accent2) 100%);
  box-shadow:0 2px 6px -1px color-mix(in srgb,var(--accent) 45%,transparent)}
 .brand span.a{color:var(--accent)}
@@ -42,7 +49,7 @@ header.top{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:22px 
 
 /* main tabs: soft raised buttons, draggable */
 nav.tabs{display:flex;gap:7px;overflow-x:auto;padding:5px 2px 14px;-webkit-overflow-scrolling:touch;scrollbar-width:thin}
-nav.tabs button{background:var(--panel);border:1px solid var(--line);border-radius:11px;padding:9px 15px;font:inherit;font-weight:500;
+nav.tabs button{background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:9px 17px;font:inherit;font-weight:500;
  color:var(--muted);cursor:grab;white-space:nowrap;box-shadow:var(--shadow);transition:transform .14s ease,box-shadow .14s ease,color .14s,background .14s,border-color .14s}
 nav.tabs button:hover{color:var(--ink);transform:translateY(-1px);box-shadow:var(--shadow2);border-color:var(--line2)}
 nav.tabs button[aria-selected="true"]{background:linear-gradient(160deg,var(--accent) 0%,color-mix(in srgb,var(--accent) 78%,var(--accent2)) 100%);
@@ -51,15 +58,15 @@ nav.tabs button:active{cursor:grabbing}
 nav.tabs button.dragging{opacity:.45;transform:scale(.96)}
 nav.tabs button.dropping{outline:2px dashed var(--accent);outline-offset:2px}
 
-h2{font-size:17px;margin:0 0 10px;letter-spacing:-.01em}
-h3{font-size:11.5px;margin:0 0 9px;color:var(--muted);text-transform:uppercase;letter-spacing:.09em;font-weight:700}
+h2{font-family:var(--display);font-weight:600;font-size:21px;margin:0 0 10px;letter-spacing:-.01em}
+h3{font-size:11px;margin:0 0 9px;color:var(--muted);text-transform:uppercase;letter-spacing:.11em;font-weight:700}
 .grid{display:grid;gap:14px}
 .g4{grid-template-columns:repeat(auto-fit,minmax(158px,1fr))}
 .g2{grid-template-columns:repeat(auto-fit,minmax(310px,1fr))}
-.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:16px;box-shadow:var(--shadow)}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:17px 18px;box-shadow:var(--shadow)}
 .grid.g4>.card.stat{transition:transform .14s ease,box-shadow .14s ease}
 .grid.g4>.card.stat:hover{transform:translateY(-2px);box-shadow:var(--shadow2)}
-.stat{font-size:30px;font-weight:700;line-height:1.05;font-variant-numeric:tabular-nums;letter-spacing:-.02em;
+.stat{font-family:var(--display);font-size:34px;font-weight:600;line-height:1.02;font-variant-numeric:tabular-nums;letter-spacing:-.02em;
  background:linear-gradient(170deg,var(--panel) 0%,var(--panel2) 100%)}
 .stat small{display:block;font-size:11.5px;font-weight:500;color:var(--muted);margin-top:6px;letter-spacing:.01em}
 .stat.bad{color:var(--bad)}
@@ -99,7 +106,7 @@ th button.sorth .ar{font-size:9px;opacity:.9}
 th[aria-sort="none"] button.sorth .ar{opacity:0}
 th button.sorth:hover .ar{opacity:.45}
 th,td{text-align:left;padding:10px 13px;border-bottom:1px solid var(--line);vertical-align:middle}
-thead th{background:var(--panel2);font-size:11.5px;color:var(--muted);font-weight:700;white-space:nowrap;text-transform:uppercase;letter-spacing:.06em;position:sticky;top:0;z-index:1}
+thead th{background:linear-gradient(var(--panel2),color-mix(in srgb,var(--panel2) 80%,var(--bg)));font-size:11.5px;color:var(--muted);font-weight:700;white-space:nowrap;text-transform:uppercase;letter-spacing:.06em;position:sticky;top:0;z-index:1}
 tbody tr{transition:background .12s}
 tbody tr:hover{background:var(--panel2)}
 tr:last-child td{border-bottom:0}
@@ -113,7 +120,7 @@ tr.click{cursor:pointer}
 .skip{position:absolute;left:-9999px;top:0;background:var(--panel);color:var(--ink);border:1px solid var(--accent);border-radius:9px;padding:9px 13px;z-index:50}
 .skip:focus{left:10px;top:10px}
 .toolbar{display:flex;gap:9px;align-items:center;flex-wrap:wrap;margin-bottom:14px}
-.empty{padding:26px;color:var(--muted);text-align:center;font-size:13.5px}
+.empty{padding:30px;color:var(--muted);text-align:center;font-size:13.5px;font-family:var(--display);font-size:15px}
 .dots{display:flex;gap:4px}
 .dot{width:12px;height:12px;border-radius:4px;background:var(--idle-bg);display:inline-block}
 .dot.prog{background:var(--warn)}.dot.done{background:var(--ok)}.dot.na{background:var(--line2)}
@@ -128,6 +135,7 @@ dialog::backdrop{background:rgba(25,18,12,.5);backdrop-filter:blur(2px)}
 .qa .a.none{color:var(--muted);font-style:italic}
 .sec{border-top:1px solid var(--line);padding-top:14px;margin-top:16px}
 .sec h3{margin-top:0;color:var(--accent)}
+.dlg h2{font-family:var(--display);font-size:23px}
 .legend{display:flex;gap:13px;flex-wrap:wrap;font-size:12px;color:var(--muted);align-items:center}
 .legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:-1px}
 .rate{display:inline-block;min-width:22px;text-align:center;padding:1px 6px;border-radius:7px;font-weight:700;font-size:12px;background:var(--idle-bg);color:var(--idle)}
@@ -137,9 +145,25 @@ dialog::backdrop{background:rgba(25,18,12,.5);backdrop-filter:blur(2px)}
 .stack i{display:block;height:100%}
 .flag{display:inline-block;padding:1px 7px;border-radius:999px;font-size:11px;font-weight:650;border:1px solid currentColor;margin-left:7px;vertical-align:1px}
 .flag.medium{color:var(--warn)}.flag.low{color:var(--bad)}.flag.high{display:none}.flag.confirmed{color:var(--ok)}
-.hb{max-width:800px}
-.hb h4{font-size:15.5px;margin:20px 0 5px;text-transform:none;letter-spacing:0;color:var(--ink)}
+.hb{max-width:74ch;font-size:15px;line-height:1.68}
+.hb h4{font-family:var(--display);font-size:21px;font-weight:600;margin:26px 0 10px;text-transform:none;letter-spacing:-.01em;color:var(--ink);
+ padding-bottom:7px;border-bottom:2px solid var(--accent-soft)}
+.hb h4:first-child{margin-top:4px}
+.hb h5.hbh{font-family:var(--display);font-size:16px;font-weight:600;margin:20px 0 6px;color:var(--accent);text-transform:none;letter-spacing:0}
+.hb p{margin:0 0 13px;color:var(--ink2)}
+.hb ul{margin:0 0 14px;padding-left:20px}
+.hb li{margin:0 0 9px;color:var(--ink2)}
+.hb li .mk{color:var(--accent);font-weight:700;margin-right:3px}
+.hb li>span{display:inline}
 .hb pre{white-space:pre-wrap;font-family:inherit;margin:0 0 11px;font-size:14px;color:var(--ink2)}
+.hb details{margin:0 0 6px}
+.hb .courses{display:grid;grid-template-columns:repeat(auto-fill,minmax(248px,1fr));gap:6px 14px;margin:0 0 16px;
+ padding:14px 16px;background:var(--panel2);border-radius:11px;border:1px solid var(--line)}
+.hb .course{font-size:13.5px;color:var(--ink2)}
+.hb .lines{margin:0 0 14px;padding:12px 15px;background:var(--panel2);border-radius:11px;border:1px solid var(--line);font-size:13.5px;line-height:1.5;color:var(--ink2)}
+.facard h4.facname{font-family:var(--display);font-size:18px;font-weight:600;margin:0;text-transform:none;letter-spacing:-.01em;color:var(--ink)}
+.facard .row a{font-size:12.5px}
+.facard details summary{font-weight:600;color:var(--accent);padding:4px 0}
 mark{background:color-mix(in srgb,var(--accent2) 35%,transparent);color:inherit;border-radius:3px;padding:0 2px}
 .org{display:grid;gap:12px}
 .orgrow{display:flex;gap:11px;flex-wrap:wrap}
@@ -1161,12 +1185,166 @@ function archiveYear(ay) {
   return wrap;
 }
 
+/* ---------- dissertations: everything BU has deposited ---------- */
+function vDiss(A) {
+  var root = h("div", {});
+  var all = A.records.filter(function (r) { return r.kind === "diss"; });
+  UI.dq = UI.dq || ""; UI.ds = UI.ds || "bbc";
+  var scopes = [["bbc", "BBC"], ["neuro", "BBC and neuroscience"], ["all", "Everything BU holds"]];
+  var pick = function (r) { return UI.ds === "all" ? true : UI.ds === "neuro" ? (r.neuro || r.bbc) : r.bbc; };
+  var q = UI.dq.trim().toLowerCase();
+  var rows = all.filter(pick).filter(function (r) {
+    return !q || (r.name + " " + r.title + " " + r.advisor + " " + (r.readers || []).map(function (x) { return x.name; }).join(" ")).toLowerCase().indexOf(q) >= 0;
+  }).sort(function (a, b) { return b.year.localeCompare(a.year) || a.name.localeCompare(b.name); });
+  var sel = h("select", {"aria-label": "Which dissertations", onchange: function (e) { UI.ds = e.target.value; render(); }},
+    scopes.map(function (o) { return h("option", {value: o[0], text: o[1] + " (" + all.filter(function (r) { return o[0] === "all" ? true : o[0] === "neuro" ? (r.neuro || r.bbc) : r.bbc; }).length + ")", selected: UI.ds === o[0]}); }));
+  root.appendChild(h("div", {class: "toolbar"}, sel,
+    h("label", {class: "small muted", for: "dq", text: "Search"}),
+    h("input", {id: "dq", type: "search", placeholder: "Author, title, advisor or committee member…", value: UI.dq, style: "min-width:280px",
+      oninput: function (e) { UI.dq = e.target.value; var p = e.target.selectionStart; render(); var i = document.getElementById("dq"); if (i) { i.focus(); i.setSelectionRange(p, p); } }}),
+    h("span", {class: "grow"}),
+    h("button", {class: "btn", text: "Download CSV", onclick: function () { dissCsv(rows); }})));
+  root.appendChild(h("p", {class: "hint", text: rows.length + " dissertations. Deposited in BU's institutional repository; committees are read off each thesis's approval page, so a few older scans have none."}));
+  var tb = h("tbody", {});
+  rows.forEach(function (r) {
+    tb.appendChild(h("tr", {},
+      h("td", {text: r.year}),
+      h("td", {}, h("a", {href: r.url, target: "_blank", rel: "noopener", text: r.name})),
+      h("td", {class: "small", text: r.title}),
+      h("td", {class: "small", text: r.advisor || "—"}),
+      h("td", {class: "small muted", text: (r.readers || []).map(function (x) { return x.name; }).join(", ") || "—"}),
+      h("td", {class: "small muted", text: r.discipline || ""})));
+  });
+  if (!rows.length) tb.appendChild(h("tr", {}, h("td", {colspan: "6", class: "empty", text: "Nothing matches."})));
+  root.appendChild(h("div", {class: "tw"}, h("table", {}, h("thead", {}, h("tr", {}, ["Year", "Author", "Title", "Advisor", "Committee", "Discipline"].map(function (x) { return h("th", {text: x}); }))), tb)));
+  return root;
+}
+function dissCsv(rows) {
+  function q(v) { return '"' + String(v == null ? "" : v).replace(/"/g, '""') + '"'; }
+  var out = [["Year", "Author", "Title", "Advisor", "Committee", "Discipline", "URL"].map(q).join(",")];
+  rows.forEach(function (r) { out.push([r.year, r.name, r.title, r.advisor, (r.readers || []).map(function (x) { return x.name; }).join("; "), r.discipline, r.url].map(q).join(",")); });
+  var a = h("a", {href: URL.createObjectURL(new Blob([out.join("\n")], {type: "text/csv"})), download: "bbc-dissertations.csv"});
+  document.body.appendChild(a); a.click(); a.remove();
+}
+
+/* ---------- faculty: who they are, where their lab is, who they have trained ---------- */
+function facKey(n) { var t = String(n || "").replace(/[.,]/g, " ").trim().split(/\s+/); return t.length ? t[t.length - 1].toLowerCase() : ""; }
+function facStudents(A, fac) {
+  var k = facKey(fac.name), first = String(fac.name).split(/\s+/)[0].toLowerCase();
+  function mine(who) {
+    if (!who) return false;
+    var w = String(who).toLowerCase();
+    return w.indexOf(k) >= 0 && (w.indexOf(first.slice(0, 3)) >= 0 || w.split(/[\s,.]+/).length < 3);
+  }
+  var cur = S.students.filter(function (st) { return st.status === "active" && mine(st.advisor); });
+  var past = [], served = [];
+  A.records.filter(function (r) { return r.kind === "diss"; }).forEach(function (r) {
+    if (mine(r.advisor)) past.push(r);
+    else if ((r.readers || []).some(function (x) { return mine(x.name); })) served.push(r);
+  });
+  past.sort(function (a, b) { return b.year.localeCompare(a.year); });
+  served.sort(function (a, b) { return b.year.localeCompare(a.year); });
+  return {cur: cur, past: past, served: served};
+}
+function vFaculty(A) {
+  var root = h("div", {}), fac = A.history.filter(function (x) { return x.kind === "fac"; });
+  if (!fac.length) { root.appendChild(h("div", {class: "card empty", text: "No faculty roster loaded yet."})); return root; }
+  UI.fq = UI.fq || "";
+  root.appendChild(h("div", {class: "toolbar"},
+    h("label", {class: "small muted", for: "fq", text: "Find"}),
+    h("input", {id: "fq", type: "search", placeholder: "Name or research area…", value: UI.fq, style: "min-width:240px",
+      oninput: function (e) { UI.fq = e.target.value; var p = e.target.selectionStart; render(); var i = document.getElementById("fq"); if (i) { i.focus(); i.setSelectionRange(p, p); } }})));
+  var q = UI.fq.trim().toLowerCase();
+  var list = fac.filter(function (f) { return !q || (f.name + " " + (f.title || "") + " " + (f.blurb || "")).toLowerCase().indexOf(q) >= 0; })
+    .sort(function (a, b) { return a.name.split(" ").pop().localeCompare(b.name.split(" ").pop()); });
+  var grid = h("div", {class: "grid g2"});
+  list.forEach(function (f) {
+    var st = facStudents(A, f);
+    var card = h("div", {class: "card facard"});
+    card.appendChild(h("div", {class: "row sp"}, h("h4", {class: "facname", text: f.name}),
+      h("span", {class: "badge b-idle", text: st.cur.length + " now · " + st.past.length + " graduated"})));
+    if (f.title) card.appendChild(h("p", {class: "small muted", style: "margin:2px 0 8px", text: f.title}));
+    var links = h("div", {class: "row small", style: "margin-bottom:8px"});
+    if (f.lab) links.appendChild(h("a", {href: f.lab, target: "_blank", rel: "noopener", text: "Lab site"}));
+    if (f.profile) links.appendChild(h("a", {href: f.profile, target: "_blank", rel: "noopener", text: "BU profile"}));
+    card.appendChild(links);
+    if (f.blurb) card.appendChild(h("p", {class: "small", style: "color:var(--ink2)", text: f.blurb.length > 230 ? f.blurb.slice(0, 230) + "…" : f.blurb}));
+    function group(label, rows, render) {
+      if (!rows.length) return;
+      var d = h("details", {}, h("summary", {class: "small", text: label + " (" + rows.length + ")"}));
+      rows.forEach(function (r) { d.appendChild(render(r)); });
+      card.appendChild(d);
+    }
+    group("Current students", st.cur, function (x) {
+      return h("p", {class: "small", style: "margin:3px 0"}, h("button", {class: "link", text: x.name, onclick: function () { studentDlg(x); }}),
+        h("span", {class: "muted", text: progYear(x) ? "  year " + progYear(x) : ""}));
+    });
+    group("Graduated students", st.past, function (x) {
+      return h("p", {class: "small", style: "margin:3px 0"}, h("a", {href: x.url, target: "_blank", rel: "noopener", text: x.name}), h("span", {class: "muted", text: "  " + x.year}));
+    });
+    group("Committees served on", st.served, function (x) {
+      return h("p", {class: "small", style: "margin:3px 0"}, h("a", {href: x.url, target: "_blank", rel: "noopener", text: x.name}), h("span", {class: "muted", text: "  " + x.year + " · " + (x.advisor || "")}));
+    });
+    if (f.source && f.source.indexOf("handbook") === 0) card.appendChild(h("p", {class: "small muted", style: "margin-top:8px", text: f.source}));
+    grid.appendChild(card);
+  });
+  root.appendChild(grid);
+  root.appendChild(h("p", {class: "small muted", style: "margin-top:14px", text: "From the department's BBC faculty page, plus anyone the graduate handbook marks BBC who is not listed there. Graduation counts come from deposited dissertations, so they start around 2010."}));
+  return root;
+}
+
+/* ---------- where all of this came from ---------- */
+function vSources() {
+  var root = h("div", {});
+  root.appendChild(h("p", {class: "hint", text: "Everything in this dashboard was built from the files below. Kept here so the trail is visible, and so a wrong number can be traced back to whatever it came from."}));
+  var GROUPS = [
+    ["Your own files", [
+      ["Annual Report — BBC — 2022-2023 (Revised)", "Program annual report, cycle 2023"],
+      ["Annual Report — BBC — 2023-2024", "An exact duplicate of the 2022-2023 file; there is no 2024 report"],
+      ["Annual Report — BBC — 2024-2025", "Program annual report, cycle 2025"],
+      ["BBC_ProgressReport_2022-2023 (13 files)", "Student progress reports"],
+      ["BBC_ProgressReport_20232024 (14 files)", "Student progress reports"],
+      ["BBC_ProgressReport_20242025 (1 file)", "Only Jeff Nestor's report was in the folder"],
+      ["BBC Student Milestones Updated 4-2018.xlsx", "Milestones snapshot, April 2018"],
+      ["PBS Student Funding — AY 24-25 Revised.xlsx", "Funding by student, 2024-25 and planned 2025-26"],
+      ["2026 Grad Student Summer Funding Projections.xlsx", "Summer 2026"],
+      ["BBC Student Funding — FY 26-27.xlsx", "Obligated funding for the coming year"],
+      ["BBC & DS Student Directory 24-25.xlsx", "Not loaded — superseded by the roster"]]],
+    ["From Chantal Stern", [
+      ["BBC Combined Annual Reports 2011-2012.docx", "13 student reports — dropped, pre-2012"],
+      ["BBC and GPN student support Jan 2013.docx", "Funding snapshot, 26 students"],
+      ["BBC Student Milestones_June2017.xlsx", "Milestones snapshot, June 2017"],
+      ["BBC_StrategicPlan_2014.docx", "Dropped from the dashboard"],
+      ["BBC_agenda_April2014.docx", "Dropped from the dashboard"]]],
+    ["Gathered from the web", [
+      ["BU Graduate Student Handbook 2026/2027", "The full handbook, searchable under Tools"],
+      ["OpenBU institutional repository", "Dissertations, committees, advisors and years"],
+      ["PBS BBC faculty page", "The faculty roster"],
+      ["Lab pages, ORCID and OSF", "Student CVs and alumni career outcomes"]]]
+  ];
+  GROUPS.forEach(function (g) {
+    var card = h("div", {class: "card", style: "margin-bottom:12px"}, h("h3", {text: g[0]}));
+    g[1].forEach(function (x) { card.appendChild(h("div", {class: "qa"}, h("div", {class: "q", text: x[0]}), h("div", {class: "a small", text: x[1]}))); });
+    root.appendChild(card);
+  });
+  var src = (S.archive ? S.archive.history : []).filter(function (x) { return x.kind === "src"; });
+  if (src.length) {
+    var c2 = h("div", {class: "card"}, h("h3", {text: "Web sources, with their dates"}));
+    src.sort(function (a, b) { return (a.title || "").localeCompare(b.title || ""); }).forEach(function (x) {
+      c2.appendChild(h("p", {class: "small"}, h("a", {href: x.url, target: "_blank", rel: "noopener", text: x.title || x.url}),
+        h("span", {class: "muted", text: "  ·  " + (x.doc_date || x.http_last_modified || "undated")})));
+    });
+    root.appendChild(c2);
+  }
+  return root;
+}
+
 /* ---------- tools: handbook, org chart, program reference ---------- */
 function hbSections() { return S.archive ? S.archive.history.filter(function (x) { return x.kind === "hb"; }).sort(function (a, b) { return (a.ord || 0) - (b.ord || 0); }) : []; }
 function orgPeople() { return S.archive ? S.archive.history.filter(function (x) { return x.kind === "org"; }) : []; }
 function progFacts() { return S.archive ? S.archive.history.filter(function (x) { return x.kind === "prog"; }) : []; }
-function hlight(txt, q) {
-  var box = h("pre", {});
+function hlight(txt, q, tag) {
+  var box = h(tag || "pre", {});
   if (!q) { box.textContent = txt; return box; }
   var re = new RegExp("(" + q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + ")", "ig"), last = 0, m;
   while ((m = re.exec(txt))) {
@@ -1181,12 +1359,38 @@ function hlight(txt, q) {
 function vTools() {
   var root = h("div", {});
   UI.tv = UI.tv || "handbook";
-  root.appendChild(subtabs("Tools", [["handbook", "Student handbook"], ["org", "Org chart"], ["program", "Program reference"], ["links", "Links"], ["settings", "Settings"]], UI.tv, function (v) { UI.tv = v; UI.hv = "tv" + v; render(); }));
+  root.appendChild(subtabs("Tools", [["handbook", "Student handbook"], ["program", "Program reference"], ["links", "Links"], ["sources", "Source data"], ["settings", "Settings"]], UI.tv, function (v) { UI.tv = v; UI.hv = "tv" + v; render(); }));
   if (UI.tv === "settings") { root.appendChild(vSettings()); return root; }
   if (UI.tv === "links") { root.appendChild(vLinks()); return root; }
   if (!archiveGuard(root)) return root;
-  root.appendChild(UI.tv === "org" ? vOrg() : UI.tv === "program" ? vProgRef() : vHandbook());
+  root.appendChild(UI.tv === "sources" ? vSources() : UI.tv === "program" ? vProgRef() : vHandbook());
   return root;
+}
+function hbBlocks(into, sec, q) {
+  var blocks = sec.blocks;
+  if (!blocks || !blocks.length) { into.appendChild(hlight(sec.text || "", q)); return; }
+  var ul = null, norm = function (x) { return String(x || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim(); };
+  var titleKey = norm(sec.title), first = true;
+  blocks.forEach(function (b) {
+    if (first && b.t === "h" && norm(b.text) === titleKey) { first = false; return; }
+    first = false;
+    if (b.t !== "li" && b.t !== "ul") ul = null;
+    if (b.t === "h") { into.appendChild(h("h5", {class: "hbh", text: b.text})); return; }
+    if (b.t === "courses") {
+      var g = h("div", {class: "courses"});
+      b.items.forEach(function (c) { g.appendChild(h("span", {class: "course"}, hlight(c, q, "span"))); });
+      into.appendChild(g); return;
+    }
+    if (b.t === "lines") { var box = h("div", {class: "lines"}); b.items.forEach(function (c) { box.appendChild(h("div", {}, hlight(c, q, "span"))); }); into.appendChild(box); return; }
+    if (b.t === "ul") { var l = h("ul", {}); b.items.forEach(function (c) { l.appendChild(h("li", {}, hlight(c, q, "span"))); }); into.appendChild(l); return; }
+    if (b.t === "li") {
+      if (!ul) { ul = h("ul", {}); into.appendChild(ul); }
+      var li = h("li", {});
+      if (b.marker) li.appendChild(h("b", {class: "mk", text: b.marker + " "}));
+      li.appendChild(hlight(b.text, q, "span")); ul.appendChild(li); return;
+    }
+    into.appendChild(h("p", {}, hlight(b.text || "", q, "span")));
+  });
 }
 function vHandbook() {
   var root = h("div", {}), secs = hbSections();
@@ -1199,14 +1403,15 @@ function vHandbook() {
     h("span", {class: "grow"}),
     src.source_url ? h("a", {class: "small", href: src.source_url, target: "_blank", rel: "noopener", text: "Original PDF"}) : ""));
   var q = (UI.hbq || "").trim(), ql = q.toLowerCase();
-  var hits = q ? secs.filter(function (x) { return (x.title + " " + x.text).toLowerCase().indexOf(ql) >= 0; }) : secs;
+  function secText(x) { return x.title + " " + (x.text || "") + " " + (x.blocks || []).map(function (b) { return (b.text || "") + " " + (b.items || []).join(" "); }).join(" "); }
+  var hits = q ? secs.filter(function (x) { return secText(x).toLowerCase().indexOf(ql) >= 0; }) : secs;
   if (q) root.appendChild(h("p", {class: "small muted", text: hits.length + " of " + secs.length + " sections match."}));
   if (q && !hits.length) root.appendChild(h("div", {class: "card empty", text: "Nothing in the handbook matches that."}));
   var body = h("div", {class: "card hb"});
   hits.forEach(function (x) {
     body.appendChild(h("h4", {text: x.title}));
-    if (!q) { body.appendChild(h("details", {}, h("summary", {class: "small muted", text: "Show"}), hlight(x.text, ""))); return; }
-    body.appendChild(hlight(x.text, q));
+    if (!q) { var d = h("details", {}, h("summary", {class: "small muted", text: "Read this section"})); hbBlocks(d, x, ""); body.appendChild(d); return; }
+    hbBlocks(body, x, q);
   });
   root.appendChild(body);
   if (src.doc_date || src.fetched) root.appendChild(h("p", {class: "small muted", text: "Handbook version " + (src.doc_date || "undated") + (src.fetched ? ", retrieved " + src.fetched : "") + ". Check the original before relying on it for a decision."}));
@@ -1314,12 +1519,13 @@ function archiveGuard(root) {
 function vPeople() {
   var root = h("div", {});
   UI.pv = UI.pv || "students";
-  root.appendChild(subtabs("People view", [["students", "Current students"], ["cmte", "Committees"], ["load", "Committee load"], ["dir", "Everyone"], ["cohorts", "Earlier cohorts"]], UI.pv,
+  root.appendChild(subtabs("People view", [["students", "Current students"], ["faculty", "Faculty"], ["cmte", "Committees"], ["load", "Committee load"], ["dir", "Everyone"], ["diss", "Dissertations"]], UI.pv,
     function (v) { UI.pv = v; UI.hv = "pv" + v; render(); }));
   if (UI.pv === "students") { root.appendChild(vRoster()); return root; }
   if (UI.pv === "cmte") { root.appendChild(vCommittees()); return root; }
   if (UI.pv === "load") { root.appendChild(vCmteLoad()); return root; }
-  if (UI.pv === "cohorts") { if (archiveGuard(root)) root.appendChild(histCohorts(S.archive)); return root; }
+  if (UI.pv === "faculty") { if (archiveGuard(root)) root.appendChild(vFaculty(S.archive)); return root; }
+  if (UI.pv === "diss") { if (archiveGuard(root)) root.appendChild(vDiss(S.archive)); return root; }
   root.appendChild(h("p", {class: "hint", text: "Everyone the program has a record of, current and former. Click a name for their reports, funding, committee and milestones. Years in the program are counted for " + ayLabel() + "."}));
   if (!archiveGuard(root)) return root;
   root.appendChild(histPeople(S.archive));
@@ -1370,12 +1576,15 @@ function histPeopleIndex(A) {
   var by = {};
   function get(sid, name) {
     var k = sid || "n-" + nameKey(name);
-    if (!by[k]) by[k] = {key: k, sid: sid, name: sid ? (names1(sid) || niceName(name)) : niceName(name), records: [], funding: [], alumni: [], outcome: null};
+    if (!by[k]) by[k] = {key: k, sid: sid, name: sid ? (names1(sid) || niceName(name)) : niceName(name), records: [], funding: [], alumni: [], outcome: null, diss: null};
     return by[k];
   }
   function names1(sid) { var s = S.students.filter(function (x) { return x.id === sid; })[0]; return s ? s.name : ""; }
   S.students.forEach(function (s) { get(s.id, s.name); });
-  A.records.forEach(function (r) { get(r.sid, r.name).records.push(r); });
+  A.records.forEach(function (r) {
+    if (r.kind === "diss") { if (!r.bbc) return; var q = get(r.sid, r.name); q.diss = r; return; }
+    get(r.sid, r.name).records.push(r);
+  });
   A.alumni.forEach(function (r) { var p = get(r.sid, r.name); if (r.kind === "outcome") p.outcome = r; else p.alumni.push(r); });
   A.funding.forEach(function (r) { get(r.sid, r.name).funding.push(r); });
   return Object.keys(by).map(function (k) { return by[k]; }).sort(function (a, b) { return a.name.localeCompare(b.name); });
@@ -1429,7 +1638,7 @@ function histPeople(A) {
 function personDlg(p) {
   dialog(function (el, close) {
     el.appendChild(h("div", {class: "row sp"}, h("h2", {text: p.name}), h("button", {class: "btn", text: "Close", onclick: close})));
-    if (!p.records.length && !p.funding.length && !p.alumni.length && !p.outcome) el.appendChild(h("p", {class: "muted", text: "No archived records for this person yet."}));
+    if (!p.records.length && !p.funding.length && !p.alumni.length && !p.outcome && !p.diss) el.appendChild(h("p", {class: "muted", text: "No archived records for this person yet."}));
     if (p.outcome) {
       var o = p.outcome, sec = h("div", {class: "sec"}, h("h3", {text: "Where they are now"}));
       el.appendChild(sec);
@@ -1474,13 +1683,19 @@ function personDlg(p) {
       el.appendChild(h("p", {class: "small", text: f.kind === "jan13" ? f.group + " · " + Object.keys(f.support).map(function (y) { return y + ": " + f.support[y]; }).join(" · ") : f.kind === "summer" ? "Definite: " + (f.definite || "—") + " · Potential: " + (f.potential || "—") + " · Requested from PBS: " + (f.requested || "—") : "Fall " + (f.fall || "—") + " · Spring " + (f.spring || "—") + " · Next year: " + (f.nextFall || "—") + " / " + (f.nextSpring || "—") + (f.note ? " · " + f.note : "")}));
     });
     (function () {
-      var o = p.outcome;
-      if (!o || !(o.diss_readers || []).length) return;
-      el.appendChild(h("div", {class: "sec"}, h("h3", {text: "Dissertation committee"})));
-      o.diss_readers.forEach(function (r) {
+      var d = p.diss, o = p.outcome;
+      var readers = (d && d.readers) || (o && o.diss_readers) || [];
+      if (!d && !readers.length) return;
+      el.appendChild(h("div", {class: "sec"}, h("h3", {text: "Dissertation"})));
+      if (d) {
+        el.appendChild(h("p", {class: "small"}, h("b", {text: d.title})));
+        el.appendChild(h("p", {class: "small muted", text: [d.year, d.discipline, d.advisor ? "advised by " + d.advisor : ""].filter(Boolean).join(" · ")}));
+      }
+      readers.forEach(function (r) {
         el.appendChild(h("p", {class: "small"}, h("b", {text: r.name}), h("span", {class: "muted", text: "  " + r.rank + (r.title ? " · " + r.title : "")})));
       });
-      el.appendChild(h("p", {class: "small muted", text: "From the approval page of the dissertation in BU's repository."}));
+      if (readers.length) el.appendChild(h("p", {class: "small muted", text: "Committee read off the approval page of the deposited thesis."}));
+      if (d && d.url) el.appendChild(h("p", {class: "small"}, h("a", {href: d.url, target: "_blank", rel: "noopener", text: "Open the dissertation"})));
     })();
     p.records.slice().sort(function (a, b) { return a.year.localeCompare(b.year); }).forEach(function (r) {
       el.appendChild(h("div", {class: "sec"}, h("h3", {text: "Progress report " + r.year})));
