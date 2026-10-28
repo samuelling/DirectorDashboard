@@ -119,6 +119,7 @@ th.hidehead input{width:15px;height:15px;margin-right:6px;vertical-align:-2px}
 table.hiding tbody tr{cursor:pointer}
 table.hiding tbody tr:hover{background:var(--accent-soft)}
 td.colhidden,th.colhidden{display:none}
+tbody tr.past td:not(:nth-child(5)){opacity:.62}
 tr.ishidden{opacity:.42}
 tr.ishidden td{text-decoration:line-through;text-decoration-color:var(--line2)}
 .tw{overflow-x:auto;border:1px solid var(--line);border-radius:var(--r);background:var(--panel);box-shadow:var(--shadow)}
@@ -1014,22 +1015,41 @@ function memberDlg(m) {
 }
 
 /* ---------- grants ---------- */
+function grantActive(g) {
+  if (!g.ends) return true;                /* open-ended until an end date is set */
+  return String(g.ends).slice(0, 10) >= todayStr();
+}
 function vGrants() {
   var root = h("div", {});
   if (!archiveGuard(root)) return root;
-  var rows = labRows("grant");
+  var all = labRows("grant"), live = all.filter(grantActive);
+  if (!UI.gscope) UI.gscope = "active";
+  var rows = UI.gscope === "all" ? all : live;
   root.appendChild(h("div", {class: "toolbar"}, h("span", {class: "grow"}),
     h("button", {class: "btn primary", text: "+ Add award", onclick: function () { grantDlg(null); }})));
-  if (!rows.length) { root.appendChild(h("div", {class: "card empty", text: "No awards on file. Add one to start tracking report dates."})); return root; }
+  if (all.length) root.appendChild(subtabs("Which awards", [
+    ["active", "Active (" + live.length + ")"],
+    ["all", "All (" + all.length + ")"]
+  ], UI.gscope, function (v) { UI.gscope = v; render(); }));
+  if (!all.length) { root.appendChild(h("div", {class: "card empty", text: "No awards on file. Add one to start tracking report dates."})); return root; }
+  if (!rows.length) { root.appendChild(h("div", {class: "card empty", text: "Nothing active right now. " + all.length + " ended award" + (all.length > 1 ? "s are" : " is") + " under All."})); return root; }
   var tb = h("tbody", {});
-  rows.sort(function (a, b) { return (a.ends || "9").localeCompare(b.ends || "9"); }).forEach(function (g) {
-    tb.appendChild(h("tr", {}, h("td", {}, h("button", {class: "link", text: g.code || g.title, onclick: function () { grantDlg(g); }})),
+  /* active first, soonest to end; then the ended ones, most recent first */
+  rows.slice().sort(function (a, b) {
+    var aa = grantActive(a), ba = grantActive(b);
+    if (aa !== ba) return aa ? -1 : 1;
+    if (!aa) return (b.ends || "").localeCompare(a.ends || "");
+    return (a.ends || "9").localeCompare(b.ends || "9");
+  }).forEach(function (g) {
+    var on = grantActive(g);
+    tb.appendChild(h("tr", {class: on ? "" : "past"}, h("td", {}, h("button", {class: "link", text: g.code || g.title, onclick: function () { grantDlg(g); }})),
       h("td", {class: "small", text: g.title || "—"}),
       h("td", {class: "small", text: g.role || "—"}),
       h("td", {class: "small", text: (g.starts || "?") + " – " + (g.ends || "?")}),
-      h("td", {}, g.nextReport ? h("span", {class: "row"}, h("span", {class: "small", text: fmtDate(g.nextReport)}), dueBadge(g.nextReport)) : h("span", {class: "muted small", text: "—"}))));
+      h("td", {}, h("span", {class: "badge " + (on ? "b-ok" : "b-idle"), text: on ? "Active" : "Ended"})),
+      h("td", {}, g.nextReport && on ? h("span", {class: "row"}, h("span", {class: "small", text: fmtDate(g.nextReport)}), dueBadge(g.nextReport)) : h("span", {class: "muted small", text: "—"}))));
   });
-  root.appendChild(h("div", {class: "tw"}, h("table", {}, h("thead", {}, h("tr", {}, ["Award", "Title", "Your role", "Period", "Next report"].map(function (x) { return h("th", {text: x}); }))), tb)));
+  root.appendChild(h("div", {class: "tw"}, h("table", {}, h("thead", {}, h("tr", {}, ["Award", "Title", "Your role", "Period", "Status", "Next report"].map(function (x) { return h("th", {text: x}); }))), tb)));
   return root;
 }
 function grantDlg(g) {
