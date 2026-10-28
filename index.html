@@ -933,19 +933,51 @@ function revData() {
     var sa = rv.student ? rv.student.a || {} : null, aa = rv.advisor ? rv.advisor.a || {} : null;
     function rating(n) { return aa && typeof aa["r" + n] === "number" ? aa["r" + n] : null; }
     rows.push({st: st, sa: sa, aa: aa, sSub: rv.student && rv.student.sub, aSub: rv.advisor && rv.advisor.sub,
-      r: {1: rating(1), 2: rating(2), 3: rating(3), 4: typeof st.g4 === "number" ? st.g4 : null},
+      r: {1: rating(1), 2: rating(2), 3: rating(3), 4: g4Mean(st)},
       pubs: sa ? listRows(sa.g2_pubs) : [], talks: sa ? listRows(sa.g2_talks) : [], courses: sa ? listRows(sa.g4_courses) : []});
   });
   rows.sort(function (a, b) { return a.st.name.localeCompare(b.st.name); });
   return rows;
 }
+/* Goal 4 rubric (revised 12/23): mean of 7 course-evaluation criteria, 1-5.
+   Target 4-5 · Acceptable 3-4 · Needs improvement 2-3 · Unacceptable below 2. */
+function g4Band(m) { return m == null || m === "" ? null : m >= 4 ? "t" : m >= 3 ? "a" : m >= 2 ? "n" : "u"; }
+var G4_NAME = {t: "Target", a: "Acceptable", n: "Needs improvement", u: "Unacceptable"};
+var G4_KIND = {t: "ok", a: "warn", n: "bad", u: "bad"};
+function g4Of(st, term) { var v = ((st && st.g4) || {})[term]; return typeof v === "number" ? v : null; }
+function g4Mean(st) {
+  var v = [g4Of(st, "fall"), g4Of(st, "spring")].filter(function (x) { return x != null; });
+  return v.length ? v.reduce(function (a, b) { return a + b; }, 0) / v.length : null;
+}
+function g4Chip(m) {
+  var b = g4Band(m);
+  return b ? h("span", {class: "badge b-" + G4_KIND[b], text: m.toFixed(1) + " · " + G4_NAME[b]}) : h("span", {class: "muted small", text: "Not scored"});
+}
+/* Program-level Goal 4 numbers, the shape the learning-assessment report asks for. */
+function g4Stats(term) {
+  var out = {n: 0, t: 0, a: 0, n_: 0, u: 0, unevaluated: 0, means: []};
+  S.students.filter(function (st) { return st.status === "active"; }).forEach(function (st) {
+    if (((st.g4 || {}).unevaluated || {})[term]) out.unevaluated++;
+    var m = g4Of(st, term); if (m == null) return;
+    out.n++; out.means.push(m);
+    var b = g4Band(m); if (b === "t") out.t++; else if (b === "a") out.a++; else if (b === "n") out.n_++; else out.u++;
+  });
+  out.mean = out.means.length ? out.means.reduce(function (a, b) { return a + b; }, 0) / out.means.length : null;
+  return out;
+}
 function pct(n, d) { return d ? Math.round(100 * n / d) + "%" : "—"; }
 function rateChip(v) { return h("span", {class: "rate r" + (v || 0), text: v == null ? "–" : String(v), title: v == null ? "Not rated" : v >= 3 ? "Target" : v >= 2 ? "Acceptable" : "Needs improvement"}); }
 function goalStats(rows, n) {
   var vals = rows.map(function (r) { return r.r[n]; }).filter(function (v) { return v != null; });
-  var d = {1: 0, 2: 0, 3: 0, 4: 0}; vals.forEach(function (v) { d[v]++; });
-  var t = d[3] + d[4], a = d[2], nn = d[1];
-  return {n: vals.length, mean: vals.length ? vals.reduce(function (x, y) { return x + y; }, 0) / vals.length : null, d: d, t: t, a: a, nn: nn};
+  var mean = vals.length ? vals.reduce(function (x, y) { return x + y; }, 0) / vals.length : null;
+  if (n === 4) {
+    /* Goal 4 is a 1-5 mean of course-evaluation criteria, banded differently from Goals 1-3. */
+    var d4 = {t: 0, a: 0, n: 0, u: 0};
+    vals.forEach(function (v) { d4[g4Band(v)]++; });
+    return {n: vals.length, mean: mean, d: {1: d4.u, 2: d4.n, 3: d4.a, 4: d4.t}, t: d4.t, a: d4.a, nn: d4.n + d4.u, scale: "1–5"};
+  }
+  var d = {1: 0, 2: 0, 3: 0, 4: 0}; vals.forEach(function (v) { d[Math.round(v)]++; });
+  return {n: vals.length, mean: mean, d: d, t: d[3] + d[4], a: d[2], nn: d[1], scale: "1–4"};
 }
 function vReviewsLive() {
   var root = h("div", {});
@@ -1505,9 +1537,29 @@ function reviewDlg(r) {
       el.appendChild(qa("Overall assessment and next steps", r.aa.c_overall));
       el.appendChild(qa("Discussed with the student?", r.aa.met));
     }
-    var g4 = h("select", {"aria-label": "Teaching score", onchange: function (e) { r.st.g4 = e.target.value ? Number(e.target.value) : ""; save("students", r.st); }},
-      [["", "Not scored"], ["1", "1"], ["2", "2"], ["3", "3"], ["4", "4"]].map(function (o) { return h("option", {value: o[0], text: o[1], selected: String(r.st.g4 == null ? "" : r.st.g4) === o[0]}); }));
-    el.appendChild(h("label", {class: "f", style: "max-width:220px"}, "Goal 4 teaching score (from course evaluations)", g4));
+    (function () {
+      var st = r.st; st.g4 = (typeof st.g4 === "object" && st.g4) || {};
+      if (typeof st.g4 !== "object") st.g4 = {};
+      st.g4.unevaluated = st.g4.unevaluated || {};
+      var box = h("div", {class: "sec"}, h("h3", {text: "Goal 4 · teaching (scored by you from course evaluations)"}));
+      el.appendChild(box);
+      box.appendChild(h("p", {class: "small muted", text: "Mean of the seven course-evaluation criteria, 1 (poor) to 5 (excellent). Target 4–5 · Acceptable 3–4 · Needs improvement 2–3 · Unacceptable below 2."}));
+      var live = h("div", {class: "row", style: "margin-bottom:8px"});
+      function paint() { live.textContent = ""; live.appendChild(h("span", {class: "small muted", text: "Year mean: "})); live.appendChild(g4Chip(g4Mean(st))); }
+      [["fall", "Fall"], ["spring", "Spring"]].forEach(function (t) {
+        var inp = h("input", {type: "number", min: "1", max: "5", step: "0.1", value: g4Of(st, t[0]) == null ? "" : String(g4Of(st, t[0])), placeholder: "e.g. 4.3",
+          onchange: function (e) {
+            var v = e.target.value === "" ? null : Math.min(5, Math.max(1, Number(e.target.value)));
+            if (v == null) delete st.g4[t[0]]; else st.g4[t[0]] = Math.round(v * 10) / 10;
+            save("students", st); paint();
+          }});
+        var un = h("input", {type: "checkbox", checked: !!st.g4.unevaluated[t[0]], onchange: function (e) { st.g4.unevaluated[t[0]] = e.target.checked; save("students", st); }});
+        box.appendChild(h("div", {class: "row", style: "margin-bottom:6px"},
+          h("label", {class: "f", style: "margin:0;max-width:170px"}, t[1] + " mean", inp),
+          h("label", {class: "small muted", style: "display:flex;gap:6px;align-items:center"}, un, "some sections not evaluated")));
+      });
+      box.appendChild(live); paint();
+    })();
     el.appendChild(h("div", {class: "sec"}, h("h3", {text: "Student report"})));
     if (!r.sa) el.appendChild(h("p", {class: "muted", text: "Not submitted yet."}));
     else REV_STUDENT.forEach(function (sec) {
@@ -1526,7 +1578,7 @@ function personText(r) {
     if (isFilled(r.aa.c_overall)) L.push("Overall: " + r.aa.c_overall);
     L.push("Discussed with student: " + (r.aa.met || "—"));
   }
-  if (r.st.g4) L.push("Goal 4 teaching score: " + r.st.g4);
+  var g4m = g4Mean(r.st); if (g4m != null) L.push("Goal 4 teaching: mean " + g4m.toFixed(1) + " (" + G4_NAME[g4Band(g4m)] + "); fall " + (g4Of(r.st, "fall") == null ? "—" : g4Of(r.st, "fall")) + ", spring " + (g4Of(r.st, "spring") == null ? "—" : g4Of(r.st, "spring")) + ")");
   L.push("", "STUDENT REPORT");
   if (!r.sa) L.push("Not submitted.");
   else REV_STUDENT.forEach(function (sec) {
