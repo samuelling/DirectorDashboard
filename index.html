@@ -1161,17 +1161,41 @@ function vProgRef() {
   });
   return root;
 }
+var LABS = [
+  ["Sam Ling", "https://sites.bu.edu/vision/"],
+  ["Rachel Denison", "https://sites.bu.edu/denisonlab/"],
+  ["David Somers", "https://sites.bu.edu/fmri/"],
+  ["Marc Howard", "https://sites.bu.edu/tcn/"],
+  ["Robert Reinhart", "https://reinhartlab.org/"],
+  ["Michael Hasselmo", "https://www.bu.edu/hasselmo/"],
+  ["Joseph McGuire", "https://sites.bu.edu/cdlab/"],
+  ["Kate Nussenbaum", "https://bucoldlab.org/"],
+  ["Heidi Meyer", "https://www.meyerlabneuro.com/"],
+  ["Benjamin Scott", "https://www.scottcognitionlab.com/"],
+  ["Mark Howe", "https://www.howe-lab.org/"],
+  ["Catherine Caldwell-Harris", "https://sites.bu.edu/caldwell-harris-lab/"],
+  ["Chandramouli Chandrasekaran", "https://sites.bu.edu/chandlab/"]
+];
 function vLinks() {
   var root = h("div", {}), L = [
     ["Annual report form (students and advisors)", "https://samuelling.github.io/BBC_Survey/"],
     ["Annual report responses (private sheet)", S.sheetId ? "https://docs.google.com/spreadsheets/d/" + S.sheetId : ""],
     ["BU Psychological & Brain Sciences", "https://www.bu.edu/psych/"],
+    ["PBS graduate students directory (everyone, by track)", "https://www.bu.edu/psych/people/graduate-students/"],
     ["BU Graduate School of Arts & Sciences", "https://www.bu.edu/cas/academics/graduate-studies/"],
     ["OpenBU dissertation repository", "https://open.bu.edu/"]
   ];
   var card = h("div", {class: "card"});
   L.forEach(function (x) { if (x[1]) card.appendChild(h("p", {}, h("a", {href: x[1], target: "_blank", rel: "noopener", text: x[0]}))); });
   root.appendChild(card);
+  var labs = h("div", {class: "card", style: "margin-top:10px"}, h("h3", {text: "Advisor lab sites"}));
+  var adv = {};
+  S.students.forEach(function (st) { if (st.status === "active" && st.advisor) adv[st.advisor] = (adv[st.advisor] || 0) + 1; });
+  LABS.slice().sort(function (a, b) { return (adv[b[0]] || 0) - (adv[a[0]] || 0) || a[0].localeCompare(b[0]); }).forEach(function (x) {
+    labs.appendChild(h("p", {class: "small"}, h("a", {href: x[1], target: "_blank", rel: "noopener", text: x[0]}),
+      h("span", {class: "muted", text: adv[x[0]] ? "  ·  " + adv[x[0]] + " current " + (adv[x[0]] === 1 ? "student" : "students") : ""})));
+  });
+  root.appendChild(labs);
   var src = (S.archive ? S.archive.history : []).filter(function (x) { return x.kind === "src"; });
   if (src.length) {
     var c2 = h("div", {class: "card", style: "margin-top:10px"}, h("h3", {text: "Where the program documents came from"}));
