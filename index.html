@@ -110,6 +110,17 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
 .legend{display:flex;gap:12px;flex-wrap:wrap;font-size:12px;color:var(--muted);align-items:center}
 .flag{display:inline-block;padding:0 6px;border-radius:999px;font-size:11px;font-weight:600;border:1px solid currentColor;margin-left:6px;vertical-align:1px}
 .flag.medium{color:var(--warn)}.flag.low{color:var(--bad)}.flag.high{display:none}.flag.confirmed{color:var(--ok)}
+
+.hb{max-width:780px}
+.hb h4{font-size:15px;margin:18px 0 4px;text-transform:none;letter-spacing:0;color:var(--ink)}
+.hb pre{white-space:pre-wrap;font-family:inherit;margin:0 0 10px;font-size:14px}
+mark{background:var(--warn-bg);color:inherit;border-radius:2px;padding:0 1px}
+.org{display:grid;gap:10px}
+.orgrow{display:flex;gap:10px;flex-wrap:wrap}
+.orgbox{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:8px 12px;min-width:170px;box-shadow:var(--shadow)}
+.orgbox b{display:block;font-size:14px}
+.orgbox span{font-size:12px;color:var(--muted)}
+.orggroup>h3{margin:14px 0 6px}
 .legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:4px;vertical-align:-1px}
 </style>
 </head>
@@ -338,9 +349,10 @@ var TABS = [
   ["funding", "Funding"],
   ["people", "People"],
   ["program", "Program"],
+  ["tools", "Tools"],
   ["settings", "Settings"]
 ];
-var VIEWS = {overview: vOverview, tasks: vTasks, students: vStudents, notes: vNotes, reviews: vReviews, funding: vFunding, people: vPeople, program: vProgram, settings: vSettings};
+var VIEWS = {overview: vOverview, tasks: vTasks, students: vStudents, notes: vNotes, reviews: vReviews, funding: vFunding, people: vPeople, program: vProgram, tools: vTools, settings: vSettings};
 
 /* Roving-tabindex keyboard navigation shared by the main tabs and every subtab row. */
 function wireTablist(el) {
@@ -1066,6 +1078,109 @@ function archiveYear(ay) {
   return wrap;
 }
 
+/* ---------- tools: handbook, org chart, program reference ---------- */
+function hbSections() { return S.archive ? S.archive.history.filter(function (x) { return x.kind === "hb"; }).sort(function (a, b) { return (a.ord || 0) - (b.ord || 0); }) : []; }
+function orgPeople() { return S.archive ? S.archive.history.filter(function (x) { return x.kind === "org"; }) : []; }
+function progFacts() { return S.archive ? S.archive.history.filter(function (x) { return x.kind === "prog"; }) : []; }
+function hlight(txt, q) {
+  var box = h("pre", {});
+  if (!q) { box.textContent = txt; return box; }
+  var re = new RegExp("(" + q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + ")", "ig"), last = 0, m;
+  while ((m = re.exec(txt))) {
+    if (m.index > last) box.appendChild(document.createTextNode(txt.slice(last, m.index)));
+    box.appendChild(h("mark", {text: m[0]}));
+    last = m.index + m[0].length;
+    if (re.lastIndex === m.index) re.lastIndex++;
+  }
+  box.appendChild(document.createTextNode(txt.slice(last)));
+  return box;
+}
+function vTools() {
+  var root = h("div", {});
+  UI.tv = UI.tv || "handbook";
+  root.appendChild(subtabs("Tools", [["handbook", "Student handbook"], ["org", "Org chart"], ["program", "Program reference"], ["links", "Links"]], UI.tv, function (v) { UI.tv = v; UI.hv = "tv" + v; render(); }));
+  if (!archiveGuard(root)) return root;
+  root.appendChild(UI.tv === "org" ? vOrg() : UI.tv === "program" ? vProgRef() : UI.tv === "links" ? vLinks() : vHandbook());
+  return root;
+}
+function vHandbook() {
+  var root = h("div", {}), secs = hbSections();
+  if (!secs.length) { root.appendChild(h("div", {class: "card empty", text: "The handbook has not been loaded yet."})); return root; }
+  var src = secs[0];
+  root.appendChild(h("div", {class: "toolbar"},
+    h("label", {class: "small muted", for: "hbq", text: "Search the handbook"}),
+    h("input", {id: "hbq", type: "search", placeholder: "e.g. qualifying exam, committee, teaching", value: UI.hbq || "", style: "max-width:320px",
+      oninput: function (e) { UI.hbq = e.target.value; var p = e.target.selectionStart; render(); var i = document.getElementById("hbq"); if (i) { i.focus(); i.setSelectionRange(p, p); } }}),
+    h("span", {class: "grow"}),
+    src.source_url ? h("a", {class: "small", href: src.source_url, target: "_blank", rel: "noopener", text: "Original PDF"}) : ""));
+  var q = (UI.hbq || "").trim(), ql = q.toLowerCase();
+  var hits = q ? secs.filter(function (x) { return (x.title + " " + x.text).toLowerCase().indexOf(ql) >= 0; }) : secs;
+  if (q) root.appendChild(h("p", {class: "small muted", text: hits.length + " of " + secs.length + " sections match."}));
+  if (q && !hits.length) root.appendChild(h("div", {class: "card empty", text: "Nothing in the handbook matches that."}));
+  var body = h("div", {class: "card hb"});
+  hits.forEach(function (x) {
+    body.appendChild(h("h4", {text: x.title}));
+    if (!q) { body.appendChild(h("details", {}, h("summary", {class: "small muted", text: "Show"}), hlight(x.text, ""))); return; }
+    body.appendChild(hlight(x.text, q));
+  });
+  root.appendChild(body);
+  if (src.doc_date || src.fetched) root.appendChild(h("p", {class: "small muted", text: "Handbook version " + (src.doc_date || "undated") + (src.fetched ? ", retrieved " + src.fetched : "") + ". Check the original before relying on it for a decision."}));
+  return root;
+}
+function vOrg() {
+  var root = h("div", {}), ppl = orgPeople();
+  if (!ppl.length) { root.appendChild(h("div", {class: "card empty", text: "The org chart has not been loaded yet."})); return root; }
+  var GROUPS = [["department", "Department"], ["program", "Program and track leadership"], ["staff", "Staff"], ["faculty", "BBC-affiliated faculty"]];
+  var wrap = h("div", {class: "org"});
+  GROUPS.forEach(function (g) {
+    var list = ppl.filter(function (p) { return (p.group || "faculty") === g[0]; });
+    if (!list.length) return;
+    var box = h("div", {class: "orggroup"}, h("h3", {text: g[1]}));
+    var row = h("div", {class: "orgrow"});
+    list.sort(function (a, b) { return (a.role || "").localeCompare(b.role || ""); }).forEach(function (p) {
+      row.appendChild(h("div", {class: "orgbox"}, h("b", {text: p.name}), h("span", {text: p.role || ""}), p.reports_to ? h("span", {class: "small muted", text: "reports to " + p.reports_to}) : ""));
+    });
+    box.appendChild(row); wrap.appendChild(box);
+  });
+  root.appendChild(wrap);
+  root.appendChild(h("p", {class: "small muted", style: "margin-top:14px", text: "Built from public department pages. Roles change — confirm before using in anything official."}));
+  return root;
+}
+function vProgRef() {
+  var root = h("div", {}), facts = progFacts();
+  if (!facts.length) { root.appendChild(h("div", {class: "card empty", text: "Program reference has not been loaded yet."})); return root; }
+  var cats = {};
+  facts.forEach(function (f) { (cats[f.cat] = cats[f.cat] || []).push(f); });
+  Object.keys(cats).sort().forEach(function (c) {
+    var card = h("div", {class: "card", style: "margin-bottom:10px"}, h("h3", {text: c}));
+    cats[c].forEach(function (f) {
+      card.appendChild(h("div", {class: "qa"}, h("div", {class: "q", text: f.topic}), h("div", {class: "a", text: f.text})));
+      if (f.source_url) card.appendChild(h("p", {class: "small"}, h("a", {href: f.source_url, target: "_blank", rel: "noopener", text: "Source"})));
+    });
+    root.appendChild(card);
+  });
+  return root;
+}
+function vLinks() {
+  var root = h("div", {}), L = [
+    ["Annual report form (students and advisors)", "https://samuelling.github.io/BBC_Survey/"],
+    ["Annual report responses (private sheet)", S.sheetId ? "https://docs.google.com/spreadsheets/d/" + S.sheetId : ""],
+    ["BU Psychological & Brain Sciences", "https://www.bu.edu/psych/"],
+    ["BU Graduate School of Arts & Sciences", "https://www.bu.edu/cas/academics/graduate-studies/"],
+    ["OpenBU dissertation repository", "https://open.bu.edu/"]
+  ];
+  var card = h("div", {class: "card"});
+  L.forEach(function (x) { if (x[1]) card.appendChild(h("p", {}, h("a", {href: x[1], target: "_blank", rel: "noopener", text: x[0]}))); });
+  root.appendChild(card);
+  var src = (S.archive ? S.archive.history : []).filter(function (x) { return x.kind === "src"; });
+  if (src.length) {
+    var c2 = h("div", {class: "card", style: "margin-top:10px"}, h("h3", {text: "Where the program documents came from"}));
+    src.forEach(function (x) { c2.appendChild(h("p", {class: "small"}, h("a", {href: x.url, target: "_blank", rel: "noopener", text: x.title || x.url}), h("span", {class: "muted", text: " · " + (x.doc_date || x.http_last_modified || "undated")}))); });
+    root.appendChild(c2);
+  }
+  return root;
+}
+
 /* ---------- history / archive ---------- */
 var hist = {loading: false, error: "", view: "outcomes", q: ""};
 function loadArchive() {
@@ -1073,8 +1188,8 @@ function loadArchive() {
   return call("archive").then(function (r) {
     hist.loading = false;
     if (r && r.ok) S.archive = r.archive; else hist.error = r && r.error === "unknown action" ? "The backend script needs the latest update." : "Could not load the archive.";
-    setSync("", false); if (["people", "program", "funding", "reviews"].indexOf(UI.tab) >= 0) render();
-  }).catch(function () { hist.loading = false; hist.error = "Could not reach the server."; setSync("", false); if (["people", "program", "funding", "reviews"].indexOf(UI.tab) >= 0) render(); });
+    setSync("", false); if (["people", "program", "funding", "reviews", "tools"].indexOf(UI.tab) >= 0) render();
+  }).catch(function () { hist.loading = false; hist.error = "Could not reach the server."; setSync("", false); if (["people", "program", "funding", "reviews", "tools"].indexOf(UI.tab) >= 0) render(); });
 }
 function hSlug(x) { return String(x || "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, ""); }
 function pctOf(o) { return o ? o.target + "% / " + o.acceptable + "% / " + o.needs + "%" : "—"; }
@@ -1107,7 +1222,7 @@ function vProgram() {
   return root;
 }
 function histOutcomes(A) {
-  var cyc = A.history.filter(function (c) { return c.kind !== "doc"; }).sort(function (a, b) { return a.cycle.localeCompare(b.cycle); }), wrap = h("div", {});
+  var cyc = A.history.filter(function (c) { return c.cycle; }).sort(function (a, b) { return a.cycle.localeCompare(b.cycle); }), wrap = h("div", {});
   var live = null;
   if (S.reviews) { var rows = revData(); if (rows.some(function (r) { return r.aSub; })) live = [1, 2, 3, 4].map(function (n) { return goalStats(rows, n); }); }
   var th = h("tr", {}, h("th", {text: "Goal"}));
