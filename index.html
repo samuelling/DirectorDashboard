@@ -228,7 +228,34 @@ button.primary::after{content:"";position:absolute;inset:0;background:linear-gra
 button.primary:hover::after{transform:translateX(120%);transition:transform .65s ease}
 .subtabs button[aria-selected="true"]{box-shadow:0 2px 10px -3px color-mix(in srgb,var(--accent) 60%,transparent)}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}body::before{display:none}}
-@media (max-width:620px){.wrap{padding:0 12px 60px}thead th{position:static}.stat{font-size:25px}}
+.burger{display:none;align-items:center;gap:8px;font:inherit;font-weight:600;background:var(--panel);border:1px solid var(--line);
+ border-radius:999px;padding:9px 15px;cursor:pointer;color:var(--ink);box-shadow:var(--shadow)}
+.burger .bars{display:inline-flex;flex-direction:column;gap:3px}
+.burger .bars i{display:block;width:16px;height:2px;background:var(--accent);border-radius:2px;transition:transform .22s,opacity .22s}
+.burger[aria-expanded="true"] .bars i:nth-child(1){transform:translateY(5px) rotate(45deg)}
+.burger[aria-expanded="true"] .bars i:nth-child(2){opacity:0}
+.burger[aria-expanded="true"] .bars i:nth-child(3){transform:translateY(-5px) rotate(-45deg)}
+.sheet{display:none}
+@media (max-width:760px){
+ .wrap{padding:0 14px 64px}
+ thead th{position:static}
+ .stat{font-size:27px}
+ header.top{padding:16px 0 10px}
+ .brand{font-size:20px}
+ .burger{display:inline-flex}
+ nav.tabs{display:none}
+ nav.tabs.open{display:flex;flex-direction:column;gap:6px;padding:10px;margin:0 0 14px;background:var(--panel);
+  border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow2);overflow:visible;
+  animation:drop .22s cubic-bezier(.2,.8,.3,1) both}
+ nav.tabs.open button{width:100%;text-align:left;border-radius:11px;cursor:pointer;padding:12px 15px;font-size:16px}
+ .subtabs{gap:6px}
+ .subtabs button{padding:7px 14px}
+ .g2{grid-template-columns:1fr}
+ .dlg{padding:17px}
+ .toolbar input[type=search]{min-width:0;width:100%}
+}
+@keyframes drop{from{opacity:0;transform:translateY(-8px) scale(.985)}to{opacity:1;transform:none}}
+@media (max-width:420px){.brand{font-size:18px}.brand .mark{width:25px;height:25px}}
 </style>
 </head>
 <body>
@@ -493,17 +520,36 @@ function subtabs(label, items, current, pick) {
   return bar;
 }
 
+function isNarrow() { return window.matchMedia("(max-width:760px)").matches; }
+function setMenu(open) {
+  var nav = document.getElementById("tabnav"), b = document.getElementById("burger");
+  if (!nav || !b) return;
+  nav.classList.toggle("open", !!open);
+  b.setAttribute("aria-expanded", open ? "true" : "false");
+}
+document.addEventListener("keydown", function (e) { if (e.key === "Escape" && isNarrow()) setMenu(false); });
+document.addEventListener("click", function (e) {
+  if (!isNarrow()) return;
+  var nav = document.getElementById("tabnav"), b = document.getElementById("burger");
+  if (!nav || !b || !nav.classList.contains("open")) return;
+  if (!nav.contains(e.target) && !b.contains(e.target)) setMenu(false);
+});
 function render() {
   if (document.querySelector("dialog[open]")) return; // don't clobber an open editor
   app.textContent = "";
+  var burger = h("button", {class: "burger", id: "burger", "aria-expanded": "false", "aria-controls": "tabnav", "aria-label": "Sections",
+    onclick: function () { setMenu(document.getElementById("tabnav").classList.contains("open") ? false : true); }},
+    h("span", {class: "bars", "aria-hidden": "true"}, h("i", {}), h("i", {}), h("i", {})),
+    h("span", {class: "bl", text: (TABS.filter(function (t) { return t[0] === UI.tab; })[0] || ["", "Menu"])[1]}));
   app.appendChild(h("header", {class: "top"},
     h("div", {class: "brand"}, h("span", {class: "mark", "aria-hidden": "true"}), "BBC ", h("span", {class: "a", text: "Director"}), " Dashboard"),
     h("div", {id: "sync", class: "sync" + (syncBad ? " bad" : ""), role: "status", "aria-live": "polite", text: syncMsg})));
-  var nav = h("nav", {class: "tabs", role: "tablist", "aria-label": "Dashboard sections"});
+  app.appendChild(burger);
+  var nav = h("nav", {class: "tabs", id: "tabnav", role: "tablist", "aria-label": "Dashboard sections"});
   tabOrder().forEach(function (t) {
     var btn = h("button", {role: "tab", id: "tab-" + t[0], draggable: "true", "data-tab": t[0], "aria-controls": "main",
       "aria-selected": String(UI.tab === t[0]), title: "Drag to reorder", text: t[1],
-      onclick: function () { UI.tab = t[0]; render(); var b = document.getElementById("tab-" + t[0]); if (b) b.focus(); }});
+      onclick: function () { UI.tab = t[0]; setMenu(false); render(); var b = document.getElementById("tab-" + t[0]); if (b && !isNarrow()) b.focus(); }});
     btn.addEventListener("dragstart", function (e) { nav.dataset.drag = t[0]; btn.classList.add("dragging"); try { e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", t[0]); } catch (x) {} });
     btn.addEventListener("dragend", function () { btn.classList.remove("dragging"); Array.prototype.forEach.call(nav.children, function (c) { c.classList.remove("dropping"); }); });
     btn.addEventListener("dragover", function (e) { if (!nav.dataset.drag || nav.dataset.drag === t[0]) return; e.preventDefault(); btn.classList.add("dropping"); });
