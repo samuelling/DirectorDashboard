@@ -206,6 +206,23 @@ function cvCell(st) {
   if (b) td.appendChild(h("div", {class: "small muted", text: (b.src === "content" ? "latest entry " : b.src === "file" ? "file saved " : "server ") + b.raw}));
   return td;
 }
+var CMTE = [["adv", "Advisory committee"], ["pros", "Prospectus committee"], ["diss", "Dissertation committee"]];
+function cmteOf(st, k) { return ((st && st.cmte) || {})[k] || []; }
+function cmteAll(st) {
+  var seen = {}, out = [];
+  CMTE.forEach(function (c) { cmteOf(st, c[0]).forEach(function (n) { if (!seen[n]) { seen[n] = 1; out.push(n); } }); });
+  return out;
+}
+/* Everyone who shows up as an advisor or on any committee — used for the datalist and the service-load view. */
+function facultyPool() {
+  var seen = {};
+  S.students.forEach(function (st) {
+    if (st.advisor) seen[st.advisor] = 1;
+    cmteAll(st).forEach(function (n) { seen[n] = 1; });
+  });
+  if (S.archive) S.archive.records.forEach(function (r) { (r.committee || []).forEach(function (n) { seen[n] = 1; }); if (r.advisor) seen[r.advisor] = 1; });
+  return Object.keys(seen).filter(Boolean).sort();
+}
 function studentById(id) { return S.students.filter(function (s) { return s.id === id; })[0]; }
 function badge(text, kind) { return h("span", {class: "badge b-" + kind, text: text}); }
 function copy(text, msg) {
@@ -531,6 +548,15 @@ function taskDlg(t, preset) {
 
 /* ---------- students ---------- */
 function vStudents() {
+  var shell = h("div", {});
+  UI.sv = UI.sv || "roster";
+  shell.appendChild(subtabs("Student view", [["roster", "Roster"], ["cmte", "Committees"], ["load", "Committee load"]], UI.sv, function (v) { UI.sv = v; UI.hv = "sv" + v; render(); }));
+  if (UI.sv === "cmte") { shell.appendChild(vCommittees()); return shell; }
+  if (UI.sv === "load") { shell.appendChild(vCmteLoad()); return shell; }
+  shell.appendChild(vRoster());
+  return shell;
+}
+function vRoster() {
   var root = h("div", {});
   var q = h("input", {type: "search", placeholder: "Search students or advisors", value: UI.q, "aria-label": "Search", oninput: function (e) { UI.q = e.target.value; drawRows(); }});
   var sf = h("select", {onchange: function (e) { UI.sf = e.target.value; render(); }},
@@ -563,6 +589,43 @@ function vStudents() {
   root.appendChild(h("p", {class: "small muted", text: "Dot legend: green = done, amber = in progress, grey = not started, dashed = not applicable. Hover for names."}));
   return root;
 }
+function vCommittees() {
+  var root = h("div", {});
+  var act = S.students.filter(function (st) { return UI.sf === "all" || st.status === (UI.sf || "active"); });
+  var missing = act.filter(function (st) { return !cmteAll(st).length; }).length;
+  root.appendChild(h("p", {class: "hint", text: missing ? missing + " of " + act.length + " students have no committee recorded. Open a student to add one — the annual report form does not collect this yet." : "Committees for all current students."}));
+  var tb = h("tbody", {});
+  act.sort(function (a, b) { return a.name.localeCompare(b.name); }).forEach(function (st) {
+    function cell(k) {
+      var l = cmteOf(st, k);
+      return l.length ? h("td", {class: "small", text: l.join(", ")}) : h("td", {class: "small muted", text: "—"});
+    }
+    tb.appendChild(h("tr", {}, h("td", {}, h("button", {class: "link", text: st.name, onclick: function () { studentDlg(st); }})), h("td", {text: st.advisor}), yearCell(st), cell("adv"), cell("pros"), cell("diss")));
+  });
+  root.appendChild(h("div", {class: "tw"}, h("table", {}, h("thead", {}, h("tr", {}, ["Student", "Major professor", "Year", "Advisory", "Prospectus", "Dissertation"].map(function (x) { return h("th", {text: x}); }))), tb)));
+  return root;
+}
+function vCmteLoad() {
+  var root = h("div", {});
+  root.appendChild(h("p", {class: "hint", text: "How much committee service each faculty member is carrying, so it can be spread fairly. Counts current students only."}));
+  var act = S.students.filter(function (st) { return st.status === "active"; }), by = {};
+  function bump(n, key, who) { if (!n) return; var r = by[n] = by[n] || {name: n, advise: [], adv: [], pros: [], diss: []}; r[key].push(who); }
+  act.forEach(function (st) {
+    bump(st.advisor, "advise", st.name);
+    CMTE.forEach(function (c) { cmteOf(st, c[0]).forEach(function (n) { if (n !== st.advisor) bump(n, c[0], st.name); }); });
+  });
+  var rows = Object.keys(by).map(function (k) { return by[k]; });
+  rows.forEach(function (r) { r.total = r.advise.length + Math.max(r.adv.length, r.pros.length, r.diss.length); });
+  rows.sort(function (a, b) { return b.total - a.total || a.name.localeCompare(b.name); });
+  var tb = h("tbody", {});
+  rows.forEach(function (r) {
+    function c(l) { return l.length ? h("td", {class: "small", text: l.length + " (" + l.join(", ") + ")"}) : h("td", {class: "small muted", text: "—"}); }
+    tb.appendChild(h("tr", {}, h("td", {text: r.name}), h("td", {text: String(r.advise.length)}), c(r.adv), c(r.pros), c(r.diss)));
+  });
+  if (!rows.length) tb.appendChild(h("tr", {}, h("td", {colspan: "5", class: "empty", text: "No committees recorded yet."})));
+  root.appendChild(h("div", {class: "tw"}, h("table", {}, h("thead", {}, h("tr", {}, ["Faculty", "Advises", "Advisory", "Prospectus", "Dissertation"].map(function (x) { return h("th", {text: x}); }))), tb)));
+  return root;
+}
 var MS_OPTS = [["todo", "Not started"], ["prog", "In progress"], ["done", "Done"], ["na", "N/A"]];
 function studentDlg(s) {
   var isNew = !s;
@@ -575,6 +638,21 @@ function studentDlg(s) {
     el.appendChild(h("div", {class: "row sp"}, h("h2", {text: isNew ? "Add student" : s.name}), h("button", {class: "btn", text: "Close", onclick: close})));
     if (isNew) el.appendChild(fld("Name", "name"));
     el.appendChild(h("div", {class: "cols2"}, fld("Advisor", "advisor"), fld("Entry academic year (e.g. 2023-2024)", "cohort")));
+    (function () {
+      var sec = h("div", {class: "sec"}, h("h3", {text: "Committees"}));
+      el.appendChild(sec);
+      var dl = h("datalist", {id: "facpool"}, facultyPool().map(function (n) { return h("option", {value: n}); }));
+      sec.appendChild(dl);
+      CMTE.forEach(function (c) {
+        s.cmte = s.cmte || {};
+        sec.appendChild(h("label", {class: "f"}, c[1] + " (comma-separated names)",
+          h("input", {list: "facpool", value: cmteOf(s, c[0]).join(", "), placeholder: "e.g. Rachel Denison, Sam Ling, David Somers",
+            onchange: function (e) {
+              s.cmte[c[0]] = e.target.value.split(",").map(function (x) { return x.trim(); }).filter(Boolean);
+              saveSoon("students", s);
+            }})));
+      });
+    })();
     (function () {
       var cv = s.cv = s.cv || {};
       var sec = h("div", {class: "sec"}, h("h3", {text: "CV"}));
