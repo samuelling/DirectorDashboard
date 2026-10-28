@@ -729,7 +729,7 @@ function vLabHome() {
     h("div", {class: "card stat", text: String(grants.length)}, h("small", {text: "Active awards"})),
     h("div", {class: "card stat" + (nextIrb != null && nextIrb < 60 ? " bad" : ""), text: nextIrb == null ? "—" : nextIrb + "d"}, h("small", {text: "Next IRB renewal"})),
     (function () {
-      var c = labRows("cash")[0];
+      var c = cashNow();
       if (!c) return h("div", {class: "card stat", text: nextRep == null ? "—" : nextRep + "d"}, h("small", {text: "Next grant report"}));
       return h("div", {class: "card stat" + (c.balance <= c.threshold * 1.8 ? " bad" : ""), text: "$" + c.balance},
         h("small", {text: "Subject cash box"}));
@@ -875,8 +875,82 @@ function irbDlg(p) {
 }
 
 /* ---------- admin: the chores ---------- */
+/* The payment sheet is readable cross-origin, so the box balance can be live.
+   The stored snapshot stays as a fallback for when the sheet is unreachable. */
+var cashLive = {state: "idle", data: null, err: ""};
+function csvRows(t) {
+  var rows = [], row = [], f = "", q = false;
+  for (var i = 0; i < t.length; i++) {
+    var c = t[i];
+    if (q) { if (c === '"') { if (t[i + 1] === '"') { f += '"'; i++; } else q = false; } else f += c; }
+    else if (c === '"') q = true;
+    else if (c === ",") { row.push(f); f = ""; }
+    else if (c === "\n") { row.push(f); rows.push(row); row = []; f = ""; }
+    else if (c !== "\r") f += c;
+  }
+  if (f !== "" || row.length) { row.push(f); rows.push(row); }
+  return rows;
+}
+function cashParse(text) {
+  var rows = csvRows(text), start = -1;
+  for (var i = 0; i < rows.length; i++) if (String(rows[i][0] || "").trim().toLowerCase() === "subject name") { start = i + 1; break; }
+  if (start < 0) throw new Error("no header");
+  function pd(v) {
+    v = String(v || "").trim().replace(/\/\//g, "/");
+    var m = /^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/.exec(v);
+    if (!m) { var d2 = new Date(v); return isNaN(d2) ? null : d2; }
+    var y = +m[3]; if (y < 100) y += 2000;
+    return new Date(y, +m[1] - 1, +m[2]);
+  }
+  function nm(v) { var x = parseFloat(String(v || "").replace(/[^0-9.\-]/g, "")); return isNaN(x) ? null : x; }
+  var bal = null, balDate = "", pays = [], payers = {}, studies = {};
+  var now = new Date(), cut = new Date(now.getTime() - 182 * 86400000);
+  for (var r = start; r < rows.length; r++) {
+    var row = rows[r], d = pd(row[1]), amt = nm(row[2]), rem = String(row[5] || "").trim() === "" ? null : nm(row[5]);
+    if (rem != null) { bal = rem; if (d) balDate = d.toISOString().slice(0, 10); }
+    if (d && amt && d <= now) {
+      var a = Math.abs(amt);
+      pays.push({d: d, a: a});
+      if (d >= cut) {
+        var who = String(row[4] || "").trim(), what = String(row[3] || "").trim();
+        if (who) payers[who] = (payers[who] || 0) + 1;
+        if (what) studies[what] = (studies[what] || 0) + 1;
+      }
+    }
+  }
+  var six = pays.filter(function (p) { return p.d >= cut; });
+  var burn6 = Math.round(six.reduce(function (s2, p) { return s2 + p.a; }, 0) / 6);
+  function top(o) { return Object.keys(o).sort(function (a, b) { return o[b] - o[a]; }).slice(0, 4); }
+  var runway = burn6 > 0 ? (bal - 200) / burn6 : null;
+  return {balance: bal, asOf: balDate, threshold: 200, burn6: burn6, n6: six.length,
+    hitsThreshold: (runway != null && runway > 0) ? new Date(now.getTime() + runway * 30.4 * 86400000).toISOString().slice(0, 10) : "",
+    payers: top(payers), studies: top(studies), fetched: todayStr(), live: true};
+}
+function cashLoad(force) {
+  var stored = labRows("cash")[0];
+  if (!stored || !stored.sheet) return Promise.resolve(null);
+  if (cashLive.state === "ok" && !force) return Promise.resolve(cashLive.data);
+  cashLive.state = "loading";
+  var url = stored.sheet.replace(/\/edit.*$/, "") + "/export?format=csv";
+  return fetch(url, {cache: "no-store"}).then(function (r) { return r.text(); }).then(function (t) {
+    cashLive.data = cashParse(t); cashLive.state = "ok"; cashLive.err = "";
+    if (UI.tab === "ladmin" || UI.tab === "lhome") render();
+    return cashLive.data;
+  }).catch(function (e) {
+    cashLive.state = "err"; cashLive.err = "Could not read the sheet.";
+    if (UI.tab === "ladmin") render();
+    return null;
+  });
+}
+function cashNow() {
+  var stored = labRows("cash")[0];
+  if (!stored) return null;
+  if (cashLive.state === "idle") cashLoad(false);
+  var live = cashLive.data;
+  return live ? Object.assign({}, stored, live) : stored;
+}
 function cashCard() {
-  var c = labRows("cash")[0];
+  var c = cashNow();
   if (!c) return null;
   var low = c.balance <= c.threshold, near = !low && c.balance <= c.threshold * 1.8;
   var card = h("div", {class: "card", style: "margin-bottom:14px;border-left:3px solid var(--accent)"});
@@ -894,7 +968,13 @@ function cashCard() {
     h("a", {class: "btn small", href: c.sheet, target: "_blank", rel: "noopener", text: "Payment sheet"}),
     h("a", {class: "btn small", href: c.internal, target: "_blank", rel: "noopener", text: "Lab internal page"}),
     h("button", {class: "btn", text: "Top-up shortcut", onclick: function () { var r = recipes().filter(function (x) { return x.slug === "petty-cash"; })[0]; if (r) recipeDlg(r, null); }})));
-  card.appendChild(h("p", {class: "small muted", style: "margin-top:8px", text: "Read off the payment sheet on " + fmtDate(c.fetched) + ". Ask me to refresh it when it drifts."}));
+  var note = c.live ? "Read live from the payment sheet just now."
+    : cashLive.state === "loading" ? "Reading the payment sheet…"
+    : cashLive.state === "err" ? cashLive.err + " Showing the last reading, from " + fmtDate(c.fetched) + "."
+    : "Last reading " + fmtDate(c.fetched) + ".";
+  card.appendChild(h("div", {class: "row", style: "margin-top:8px"},
+    h("span", {class: "small muted", text: note}),
+    h("button", {class: "link small", text: cashLive.state === "loading" ? "…" : "Refresh", onclick: function () { cashLoad(true); render(); }})));
   return card;
 }
 function vAdmin() {
