@@ -144,7 +144,8 @@ dialog::backdrop{background:rgba(25,18,12,.5);backdrop-filter:blur(2px)}
 .stack{display:flex;height:9px;border-radius:999px;overflow:hidden;min-width:110px;background:var(--idle-bg)}
 .stack i{display:block;height:100%}
 .flag{display:inline-block;padding:1px 7px;border-radius:999px;font-size:11px;font-weight:650;border:1px solid currentColor;margin-left:7px;vertical-align:1px}
-.flag.medium{color:var(--warn)}.flag.low{color:var(--bad)}.flag.high{display:none}.flag.confirmed{color:var(--ok)}
+.flag.medium{color:var(--warn)}
+.facard .flag{font-family:var(--sans);font-size:10px;vertical-align:3px}.flag.low{color:var(--bad)}.flag.high{display:none}.flag.confirmed{color:var(--ok)}
 .hb{max-width:74ch;font-size:15px;line-height:1.68}
 .hb h4{font-family:var(--display);font-size:21px;font-weight:600;margin:26px 0 10px;text-transform:none;letter-spacing:-.01em;color:var(--ink);
  padding-bottom:7px;border-bottom:2px solid var(--accent-soft)}
@@ -175,7 +176,58 @@ mark{background:color-mix(in srgb,var(--accent2) 35%,transparent);color:inherit;
 .orggroup>h3{margin:16px 0 7px}
 details>summary{cursor:pointer;border-radius:7px}
 details>summary:hover{color:var(--accent)}
-@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+/* --- a bit of zazz --- */
+body::before{content:"";position:fixed;inset:0;pointer-events:none;z-index:0;opacity:.5;
+ background-image:radial-gradient(circle at 1px 1px,color-mix(in srgb,var(--ink) 9%,transparent) 1px,transparent 0);
+ background-size:22px 22px;mask-image:radial-gradient(130% 90% at 50% 0%,#000 0%,transparent 72%)}
+.wrap{position:relative;z-index:1}
+/* each tab gets its own hue, so the page changes temperature as you move around */
+body[data-tab="overview"]{--accent:#a3231b;--accent2:#c7673b;--accent-soft:#f8e8e3}
+body[data-tab="people"]{--accent:#1f5f52;--accent2:#4d9c7a;--accent-soft:#e2f0ea}
+body[data-tab="reviews"]{--accent:#7a3b86;--accent2:#b06ab0;--accent-soft:#f2e7f4}
+body[data-tab="funding"]{--accent:#8a5a12;--accent2:#c69340;--accent-soft:#faeed8}
+body[data-tab="program"]{--accent:#1d4f73;--accent2:#5390b3;--accent-soft:#e3eef5}
+body[data-tab="tools"]{--accent:#5a4a8a;--accent2:#8d7ac0;--accent-soft:#ebe7f6}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) body[data-tab="people"],body[data-tab="people"]{--accent:#67c6a6;--accent2:#9fd9bf;--accent-soft:#1b3630}}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+ body[data-tab="overview"]{--accent:#ef6a5c;--accent2:#e09a5f;--accent-soft:#36242a}
+ body[data-tab="people"]{--accent:#6cc9a4;--accent2:#9ad9c0;--accent-soft:#17332b}
+ body[data-tab="reviews"]{--accent:#c694d8;--accent2:#dcb6e6;--accent-soft:#2e2136}
+ body[data-tab="funding"]{--accent:#e2b45c;--accent2:#edd09a;--accent-soft:#352a16}
+ body[data-tab="program"]{--accent:#78b4da;--accent2:#aad3ea;--accent-soft:#1a2b38}
+ body[data-tab="tools"]{--accent:#a596e0;--accent2:#c6bbee;--accent-soft:#272143}}}
+body{transition:--accent .4s}
+.brand .mark{animation:wob 9s ease-in-out infinite}
+@keyframes wob{0%,100%{border-radius:50% 50% 50% 8px;rotate:-8deg}33%{border-radius:50% 8px 50% 50%;rotate:6deg}66%{border-radius:8px 50% 50% 50%;rotate:-3deg}}
+.brand:hover .mark{animation-duration:2.2s}
+main{animation:rise .32s cubic-bezier(.2,.7,.3,1) both}
+@keyframes rise{from{opacity:0;transform:translateY(7px)}to{opacity:1;transform:none}}
+.grid.g4>.card.stat{position:relative;overflow:hidden}
+.grid.g4>.card.stat::after{content:"";position:absolute;right:-22px;top:-22px;width:76px;height:76px;border-radius:50%;
+ background:radial-gradient(circle,color-mix(in srgb,var(--accent) 20%,transparent),transparent 68%);transition:transform .35s ease}
+.grid.g4>.card.stat:hover::after{transform:scale(1.5) translate(-6px,6px)}
+.card{position:relative}
+.sec{position:relative}
+.sec::before{content:"";position:absolute;left:0;top:-1px;width:42px;height:2px;background:var(--accent);border-radius:2px}
+nav.tabs button[aria-selected="true"]{animation:pop .3s cubic-bezier(.3,1.5,.5,1)}
+@keyframes pop{from{transform:scale(.93)}to{transform:none}}
+.badge{transition:transform .14s}
+.badge:hover{transform:scale(1.07)}
+.bar i{background:linear-gradient(90deg,var(--accent2),var(--accent));box-shadow:0 0 8px -2px var(--accent)}
+tbody tr:hover{background:color-mix(in srgb,var(--accent) 6%,var(--panel))}
+.empty::before{content:"◠‿◠";display:block;font-size:20px;color:var(--accent);opacity:.4;margin-bottom:8px;letter-spacing:2px}
+.hb h4{border-bottom-color:color-mix(in srgb,var(--accent) 28%,transparent)}
+.facard{transition:transform .16s ease,box-shadow .16s ease}
+.facard:hover{transform:translateY(-3px);box-shadow:var(--shadow2)}
+.facard::before{content:"";position:absolute;left:0;top:16px;bottom:16px;width:3px;border-radius:0 3px 3px 0;
+ background:linear-gradient(var(--accent),var(--accent2));opacity:.75}
+.facard{padding-left:22px}
+button.primary{position:relative;overflow:hidden}
+button.primary::after{content:"";position:absolute;inset:0;background:linear-gradient(110deg,transparent 35%,rgba(255,255,255,.28) 50%,transparent 65%);
+ transform:translateX(-120%)}
+button.primary:hover::after{transform:translateX(120%);transition:transform .65s ease}
+.subtabs button[aria-selected="true"]{box-shadow:0 2px 10px -3px color-mix(in srgb,var(--accent) 60%,transparent)}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}body::before{display:none}}
 @media (max-width:620px){.wrap{padding:0 12px 60px}thead th{position:static}.stat{font-size:25px}}
 </style>
 </head>
@@ -468,6 +520,7 @@ function render() {
   });
   app.appendChild(nav);
   wireTablist(nav);
+  document.body.dataset.tab = UI.tab;
   var panel = h("main", {id: "main", role: "tabpanel", tabindex: "-1", "aria-labelledby": "tab-" + UI.tab});
   panel.appendChild((VIEWS[UI.tab] || vOverview)());
   app.appendChild(panel);
@@ -556,7 +609,7 @@ function vOverview() {
   var left = h("div", {class: "card"}, h("div", {class: "row sp"}, h("h3", {text: "Needs attention", style: "margin:0"}),
     h("button", {class: "link small", text: "All tasks", onclick: function () { UI.ov = "tasks"; UI.hv = "ovtasks"; render(); }})));
   var items = overdue.concat(soon);
-  if (!items.length) left.appendChild(h("div", {class: "empty", text: "No overdue or upcoming tasks."}));
+  if (!items.length) left.appendChild(h("div", {class: "empty", text: "Nothing overdue, nothing looming. Enjoy it."}));
   items.slice(0, 8).forEach(function (t) { left.appendChild(taskRow(t, true)); });
   if (flagged.length) {
     left.appendChild(h("h3", {text: "Flagged students", style: "margin-top:14px"}));
@@ -565,7 +618,7 @@ function vOverview() {
   var right = h("div", {class: "card"}, h("div", {class: "row sp"}, h("h3", {text: "Recent notes", style: "margin:0"}),
     h("button", {class: "link small", text: "All notes", onclick: function () { UI.ov = "notes"; UI.hv = "ovnotes"; render(); }})));
   var rn = S.notes.slice().sort(function (a, b) { return (b.date || "").localeCompare(a.date || "") || (b.created || "").localeCompare(a.created || ""); }).slice(0, 6);
-  if (!rn.length) right.appendChild(h("div", {class: "empty", text: "No notes yet."}));
+  if (!rn.length) right.appendChild(h("div", {class: "empty", text: "No notes yet — this is where the paper trail starts."}));
   rn.forEach(function (n) { right.appendChild(noteRow(n)); });
   root.appendChild(h("div", {class: "grid g2"}, left, right));
   return root;
@@ -591,7 +644,7 @@ function vTasks() {
   var list = S.tasks.filter(function (t) { return UI.taskFilter === "all" || (UI.taskFilter === "done") === (t.status === "done"); });
   list.sort(function (a, b) { return (a.due || "9999").localeCompare(b.due || "9999"); });
   var card = h("div", {class: "card"});
-  if (!list.length) card.appendChild(h("div", {class: "empty", text: "Nothing here."}));
+  if (!list.length) card.appendChild(h("div", {class: "empty", text: "Nothing here. A clean slate."}));
   list.forEach(function (t) { card.appendChild(taskRow(t)); });
   root.appendChild(card);
   return root;
@@ -1256,12 +1309,14 @@ function vFaculty(A) {
       oninput: function (e) { UI.fq = e.target.value; var p = e.target.selectionStart; render(); var i = document.getElementById("fq"); if (i) { i.focus(); i.setSelectionRange(p, p); } }})));
   var q = UI.fq.trim().toLowerCase();
   var list = fac.filter(function (f) { return !q || (f.name + " " + (f.title || "") + " " + (f.blurb || "")).toLowerCase().indexOf(q) >= 0; })
-    .sort(function (a, b) { return a.name.split(" ").pop().localeCompare(b.name.split(" ").pop()); });
+    .sort(function (a, b) { return (a.emeritus ? 1 : 0) - (b.emeritus ? 1 : 0) || a.name.split(" ").pop().localeCompare(b.name.split(" ").pop()); });
   var grid = h("div", {class: "grid g2"});
   list.forEach(function (f) {
     var st = facStudents(A, f);
     var card = h("div", {class: "card facard"});
-    card.appendChild(h("div", {class: "row sp"}, h("h4", {class: "facname", text: f.name}),
+    var nm = h("h4", {class: "facname", text: f.name});
+    if (f.emeritus) nm.appendChild(h("span", {class: "flag medium", text: "emeritus"}));
+    card.appendChild(h("div", {class: "row sp"}, nm,
       h("span", {class: "badge b-idle", text: st.cur.length + " now · " + st.past.length + " graduated"})));
     if (f.title) card.appendChild(h("p", {class: "small muted", style: "margin:2px 0 8px", text: f.title}));
     var links = h("div", {class: "row small", style: "margin-bottom:8px"});
