@@ -1355,6 +1355,38 @@ function facStudents(A, fac) {
   served.sort(function (a, b) { return b.year.localeCompare(a.year); });
   return {cur: cur, past: past, served: served};
 }
+function facDlg(A, f) {
+  var st = facStudents(A, f);
+  dialog(function (el, close) {
+    var hd = h("h2", {text: f.name});
+    if (f.emeritus) hd.appendChild(h("span", {class: "flag medium", text: "emeritus"}));
+    el.appendChild(h("div", {class: "row sp"}, hd, h("button", {class: "btn", text: "Close", onclick: close})));
+    if (f.title) el.appendChild(h("p", {class: "small muted", text: f.title}));
+    var links = h("div", {class: "row small", style: "margin:8px 0"});
+    if (f.lab) links.appendChild(h("a", {href: f.lab, target: "_blank", rel: "noopener", text: "Lab site"}));
+    if (f.profile) links.appendChild(h("a", {href: f.profile, target: "_blank", rel: "noopener", text: "BU profile"}));
+    el.appendChild(links);
+    if (f.blurb) el.appendChild(h("p", {class: "small", style: "color:var(--ink2)", text: f.blurb}));
+    function sec(label, rows, line) {
+      el.appendChild(h("div", {class: "sec"}, h("h3", {text: label + " (" + rows.length + ")"})));
+      if (!rows.length) { el.appendChild(h("p", {class: "small muted", text: "None on record."})); return; }
+      rows.forEach(function (r) { el.appendChild(line(r)); });
+    }
+    sec("Current students", st.cur, function (x) {
+      return h("p", {class: "small", style: "margin:3px 0"}, h("button", {class: "link", text: x.name, onclick: function () { close(); studentDlg(x); }}),
+        h("span", {class: "muted", text: (progYear(x) ? "  year " + progYear(x) : "")}));
+    });
+    sec("Graduated students", st.past, function (x) {
+      return h("p", {class: "small", style: "margin:3px 0"}, h("a", {href: x.url, target: "_blank", rel: "noopener", text: x.name}),
+        h("span", {class: "muted", text: "  " + x.year + (x.title ? " · " + x.title.slice(0, 70) : "")}));
+    });
+    sec("Committees served on", st.served, function (x) {
+      return h("p", {class: "small", style: "margin:3px 0"}, h("a", {href: x.url, target: "_blank", rel: "noopener", text: x.name}),
+        h("span", {class: "muted", text: "  " + x.year + (x.advisor ? " · advised by " + x.advisor : "")}));
+    });
+    if (f.source) el.appendChild(h("p", {class: "small muted", style: "margin-top:12px", text: "Source: " + f.source}));
+  });
+}
 function vFaculty(A) {
   var root = h("div", {}), fac = A.history.filter(function (x) { return x.kind === "fac"; });
   if (!fac.length) { root.appendChild(h("div", {class: "card empty", text: "No faculty roster loaded yet."})); return root; }
@@ -1365,42 +1397,27 @@ function vFaculty(A) {
       oninput: function (e) { UI.fq = e.target.value; var p = e.target.selectionStart; render(); var i = document.getElementById("fq"); if (i) { i.focus(); i.setSelectionRange(p, p); } }})));
   var q = UI.fq.trim().toLowerCase();
   var list = fac.filter(function (f) { return !q || (f.name + " " + (f.title || "") + " " + (f.blurb || "")).toLowerCase().indexOf(q) >= 0; })
-    .sort(function (a, b) { return (a.emeritus ? 1 : 0) - (b.emeritus ? 1 : 0) || a.name.split(" ").pop().localeCompare(b.name.split(" ").pop()); });
-  var grid = h("div", {class: "grid g2"});
+    .sort(function (a, b) { return a.name.split(" ").pop().localeCompare(b.name.split(" ").pop()); });
+  var tb = h("tbody", {});
   list.forEach(function (f) {
     var st = facStudents(A, f);
-    var card = h("div", {class: "card facard"});
-    var nm = h("h4", {class: "facname", text: f.name});
+    var nm = h("td", {}, h("button", {class: "link", text: f.name, onclick: function () { facDlg(A, f); }}));
     if (f.emeritus) nm.appendChild(h("span", {class: "flag medium", text: "emeritus"}));
-    card.appendChild(h("div", {class: "row sp"}, nm,
-      h("span", {class: "badge b-idle", text: st.cur.length + " now · " + st.past.length + " graduated"})));
-    if (f.title) card.appendChild(h("p", {class: "small muted", style: "margin:2px 0 8px", text: f.title}));
-    var links = h("div", {class: "row small", style: "margin-bottom:8px"});
-    if (f.lab) links.appendChild(h("a", {href: f.lab, target: "_blank", rel: "noopener", text: "Lab site"}));
-    if (f.profile) links.appendChild(h("a", {href: f.profile, target: "_blank", rel: "noopener", text: "BU profile"}));
-    card.appendChild(links);
-    if (f.blurb) card.appendChild(h("p", {class: "small", style: "color:var(--ink2)", text: f.blurb.length > 230 ? f.blurb.slice(0, 230) + "…" : f.blurb}));
-    function group(label, rows, render) {
-      if (!rows.length) return;
-      var d = h("details", {}, h("summary", {class: "small", text: label + " (" + rows.length + ")"}));
-      rows.forEach(function (r) { d.appendChild(render(r)); });
-      card.appendChild(d);
-    }
-    group("Current students", st.cur, function (x) {
-      return h("p", {class: "small", style: "margin:3px 0"}, h("button", {class: "link", text: x.name, onclick: function () { studentDlg(x); }}),
-        h("span", {class: "muted", text: progYear(x) ? "  year " + progYear(x) : ""}));
-    });
-    group("Graduated students", st.past, function (x) {
-      return h("p", {class: "small", style: "margin:3px 0"}, h("a", {href: x.url, target: "_blank", rel: "noopener", text: x.name}), h("span", {class: "muted", text: "  " + x.year}));
-    });
-    group("Committees served on", st.served, function (x) {
-      return h("p", {class: "small", style: "margin:3px 0"}, h("a", {href: x.url, target: "_blank", rel: "noopener", text: x.name}), h("span", {class: "muted", text: "  " + x.year + " · " + (x.advisor || "")}));
-    });
-    if (f.source && f.source.indexOf("handbook") === 0) card.appendChild(h("p", {class: "small muted", style: "margin-top:8px", text: f.source}));
-    grid.appendChild(card);
+    var sites = h("td", {class: "small"});
+    if (f.lab) sites.appendChild(h("a", {href: f.lab, target: "_blank", rel: "noopener", text: "Lab"}));
+    if (f.lab && f.profile) sites.appendChild(h("span", {class: "muted", text: " · "}));
+    if (f.profile) sites.appendChild(h("a", {href: f.profile, target: "_blank", rel: "noopener", text: "BU"}));
+    tb.appendChild(h("tr", {}, nm,
+      h("td", {class: "small", text: f.title || "—"}),
+      h("td", {text: String(st.cur.length)}),
+      h("td", {text: String(st.past.length)}),
+      h("td", {text: String(st.served.length)}),
+      h("td", {class: "small muted", text: st.cur.map(function (x) { return x.name; }).join(", ") || "—"}),
+      sites));
   });
-  root.appendChild(grid);
-  root.appendChild(h("p", {class: "small muted", style: "margin-top:14px", text: "From the department's BBC faculty page, plus anyone the graduate handbook marks BBC who is not listed there. Graduation counts come from deposited dissertations, so they start around 2010."}));
+  root.appendChild(h("div", {class: "tw"}, h("table", {}, h("thead", {},
+    h("tr", {}, ["Faculty", "Title", "Advising", "Graduated", "Committees", "Current students", "Links"].map(function (x) { return h("th", {text: x}); }))), tb)));
+  root.appendChild(h("p", {class: "small muted", style: "margin-top:12px", text: "Click a name for their research blurb and the full list of students and committees. From the department's BBC faculty page; graduation counts come from deposited dissertations, so they start around 2010."}));
   return root;
 }
 
