@@ -373,7 +373,6 @@ function loadAll(first) {
 /* ---------- shell ---------- */
 var TABS = [
   ["overview", "Overview"],
-  ["tasks", "Tasks"],
   ["people", "People"],
   ["reviews", "Annual Report"],
   ["funding", "Funding"],
@@ -390,7 +389,7 @@ function tabOrder() {
   return out.map(function (id) { return TABS.filter(function (t) { return t[0] === id; })[0]; });
 }
 function saveTabOrder(ids) { try { localStorage.setItem("ddtabs", JSON.stringify(ids)); } catch (e) {} }
-var VIEWS = {overview: vHome, tasks: vTasks, reviews: vReviews, funding: vFunding, people: vPeople, program: vProgram, tools: vTools};
+var VIEWS = {overview: vHome, reviews: vReviews, funding: vFunding, people: vPeople, program: vProgram, tools: vTools};
 
 /* Roving-tabindex keyboard navigation shared by the main tabs and every subtab row. */
 function wireTablist(el) {
@@ -506,8 +505,8 @@ function sortable() {
 function vHome() {
   var root = h("div", {});
   UI.ov = UI.ov || "dash";
-  root.appendChild(subtabs("Overview", [["dash", "Dashboard"], ["notes", "Notes"]], UI.ov, function (v) { UI.ov = v; UI.hv = "ov" + v; render(); }));
-  root.appendChild(UI.ov === "notes" ? vNotes() : vOverview());
+  root.appendChild(subtabs("Overview", [["dash", "Dashboard"], ["tasks", "Tasks"], ["notes", "Notes"]], UI.ov, function (v) { UI.ov = v; UI.hv = "ov" + v; render(); }));
+  root.appendChild(UI.ov === "notes" ? vNotes() : UI.ov === "tasks" ? vTasks() : vOverview());
   return root;
 }
 function openTasks() { return S.tasks.filter(function (t) { return t.status !== "done"; }); }
@@ -530,7 +529,8 @@ function vOverview() {
     h("div", {class: "card stat", text: avg + "%"}, h("small", {text: "Avg milestone progress"})),
     h("div", {class: "card stat", text: rc.sSub + "/" + rc.n}, h("small", {text: "Student reports in"})),
     h("div", {class: "card stat", text: rc.aSub + "/" + rc.n}, h("small", {text: "Advisor reviews in"}))));
-  var left = h("div", {class: "card"}, h("h3", {text: "Needs attention"}));
+  var left = h("div", {class: "card"}, h("div", {class: "row sp"}, h("h3", {text: "Needs attention", style: "margin:0"}),
+    h("button", {class: "link small", text: "All tasks", onclick: function () { UI.ov = "tasks"; UI.hv = "ovtasks"; render(); }})));
   var items = overdue.concat(soon);
   if (!items.length) left.appendChild(h("div", {class: "empty", text: "No overdue or upcoming tasks."}));
   items.slice(0, 8).forEach(function (t) { left.appendChild(taskRow(t, true)); });
@@ -538,7 +538,8 @@ function vOverview() {
     left.appendChild(h("h3", {text: "Flagged students", style: "margin-top:14px"}));
     flagged.forEach(function (s) { left.appendChild(h("div", {class: "row", style: "padding:4px 0"}, h("button", {class: "link", text: s.name, onclick: function () { studentDlg(s); }}), h("span", {class: "muted small", text: s.advisor}))); });
   }
-  var right = h("div", {class: "card"}, h("h3", {text: "Recent notes"}));
+  var right = h("div", {class: "card"}, h("div", {class: "row sp"}, h("h3", {text: "Recent notes", style: "margin:0"}),
+    h("button", {class: "link small", text: "All notes", onclick: function () { UI.ov = "notes"; UI.hv = "ovnotes"; render(); }})));
   var rn = S.notes.slice().sort(function (a, b) { return (b.date || "").localeCompare(a.date || "") || (b.created || "").localeCompare(a.created || ""); }).slice(0, 6);
   if (!rn.length) right.appendChild(h("div", {class: "empty", text: "No notes yet."}));
   rn.forEach(function (n) { right.appendChild(noteRow(n)); });
