@@ -169,6 +169,43 @@ function yearCell(st) {
   var y = progYear(st);
   return h("td", {class: y == null ? "muted" : "", text: y == null ? "—" : String(y), title: y == null ? "Set the entry year on the student" : "Entered " + st.cohort});
 }
+/* A CV's "freshness" has three candidate dates and they often disagree.
+   Content is what actually matters, so prefer it, then the file date, then the server header. */
+function parseLoose(v) {
+  v = String(v || "").trim(); if (!v) return null;
+  var m = /(\d{4})-(\d{2})(?:-(\d{2}))?/.exec(v);
+  if (m) return new Date(+m[1], +m[2] - 1, +(m[3] || 15));
+  m = /(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+(\d{4})/i.exec(v);
+  if (m) return new Date(+m[2], "janfebmaraprmayjunjulaugsepoctnovdec".indexOf(m[1].slice(0, 3).toLowerCase()) / 3, 15);
+  m = /\b(19|20)\d{2}\b/.exec(v);
+  if (m) return new Date(+m[0], 11, 31);   // a bare year: assume end of year, the kindest reading
+  var d = new Date(v); return isNaN(d) ? null : d;
+}
+function cvBest(cv) {
+  if (!cv || !cv.url) return null;
+  var tries = [["content", cv.contentDate], ["file", cv.docDate], ["server", cv.lastModified]];
+  for (var i = 0; i < tries.length; i++) { var d = parseLoose(tries[i][1]); if (d) return {d: d, src: tries[i][0], raw: tries[i][1]}; }
+  return null;
+}
+function monthsAgo(d) { return d ? Math.max(0, Math.round((Date.now() - d.getTime()) / 2629800000)) : null; }
+function cvBadge(cv) {
+  if (!cv || !cv.url) return badge("No CV", "idle");
+  var b = cvBest(cv); if (!b) return badge("Undated", "warn");
+  var m = monthsAgo(b.d);
+  var kind = m <= 12 ? "ok" : m <= 24 ? "warn" : "bad";
+  var lab = m < 1 ? "This month" : m < 12 ? m + " mo" : (m / 12).toFixed(m % 12 ? 1 : 0) + " yr";
+  return badge(lab, kind);
+}
+function cvCell(st) {
+  var cv = st.cv, td = h("td", {class: "small"});
+  if (!cv || !cv.url) { td.appendChild(badge("None", "idle")); return td; }
+  var b = cvBest(cv);
+  td.appendChild(h("a", {href: cv.url, target: "_blank", rel: "noopener", text: "CV", title: cv.url, onclick: function (e) { e.stopPropagation(); }}));
+  td.appendChild(h("span", {text: " "}));
+  td.appendChild(cvBadge(cv));
+  if (b) td.appendChild(h("div", {class: "small muted", text: (b.src === "content" ? "latest entry " : b.src === "file" ? "file saved " : "server ") + b.raw}));
+  return td;
+}
 function studentById(id) { return S.students.filter(function (s) { return s.id === id; })[0]; }
 function badge(text, kind) { return h("span", {class: "badge b-" + kind, text: text}); }
 function copy(text, msg) {
@@ -500,7 +537,7 @@ function vStudents() {
     [["active", "Active"], ["leave", "On leave"], ["graduated", "Graduated"], ["all", "All"]].map(function (o) { return h("option", {value: o[0], text: o[1], selected: UI.sf === o[0]}); }));
   root.appendChild(h("div", {class: "toolbar"}, q, sf, h("span", {class: "grow"}), h("button", {class: "btn primary", text: "+ Add student", onclick: function () { studentDlg(null); }})));
   var ms = msList();
-  var thead = h("tr", {}, h("th", {text: "Student"}), h("th", {text: "Advisor"}), h("th", {text: "Year"}), h("th", {text: "Milestones"}), h("th", {text: "Progress"}), h("th", {text: "Last meeting"}));
+  var thead = h("tr", {}, h("th", {text: "Student"}), h("th", {text: "Advisor"}), h("th", {text: "Year"}), h("th", {text: "CV"}), h("th", {text: "Milestones"}), h("th", {text: "Progress"}), h("th", {text: "Last meeting"}));
   var tbody = h("tbody", {});
   root.appendChild(h("div", {class: "tw"}, h("table", {}, h("thead", {}, thead), tbody)));
   function drawRows() {
@@ -509,13 +546,14 @@ function vStudents() {
     var list = S.students.filter(function (s) {
       return (UI.sf === "all" || s.status === UI.sf) && (!needle || (s.name + " " + s.advisor).toLowerCase().indexOf(needle) >= 0);
     });
-    if (!list.length) tbody.appendChild(h("tr", {}, h("td", {colspan: "6", class: "empty", text: "No students match."})));
+    if (!list.length) tbody.appendChild(h("tr", {}, h("td", {colspan: "7", class: "empty", text: "No students match."})));
     list.forEach(function (s) {
       var p = progress(s);
       tbody.appendChild(h("tr", {class: "click", tabindex: "0", onclick: function () { studentDlg(s); }, onkeydown: function (e) { if (e.key === "Enter") studentDlg(s); }},
         h("td", {}, h("b", {text: s.name}), s.flag ? " " : "", s.flag ? badge("Flag", "bad") : "", s.cohort ? h("div", {class: "small muted", text: "Entered " + s.cohort}) : ""),
         h("td", {text: s.advisor}),
         yearCell(s),
+        cvCell(s),
         h("td", {}, h("div", {class: "dots", title: ms.map(function (m) { return m.label + ": " + msState(s, m.k); }).join("\n")}, ms.map(function (m) { return h("span", {class: "dot " + msState(s, m.k)}); }))),
         h("td", {}, h("div", {class: "row"}, h("div", {class: "bar", style: "width:70px"}, h("i", {style: "width:" + p + "%"})), h("span", {class: "small", text: p + "%"}))),
         h("td", {class: "small muted", text: s.lastMeeting ? fmtDate(s.lastMeeting) : "—"})));
@@ -537,6 +575,25 @@ function studentDlg(s) {
     el.appendChild(h("div", {class: "row sp"}, h("h2", {text: isNew ? "Add student" : s.name}), h("button", {class: "btn", text: "Close", onclick: close})));
     if (isNew) el.appendChild(fld("Name", "name"));
     el.appendChild(h("div", {class: "cols2"}, fld("Advisor", "advisor"), fld("Entry academic year (e.g. 2023-2024)", "cohort")));
+    (function () {
+      var cv = s.cv = s.cv || {};
+      var sec = h("div", {class: "sec"}, h("h3", {text: "CV"}));
+      el.appendChild(sec);
+      if (cv.url) {
+        var b = cvBest(cv);
+        sec.appendChild(h("p", {class: "small"}, h("a", {href: cv.url, target: "_blank", rel: "noopener", text: cv.url.length > 70 ? cv.url.slice(0, 70) + "…" : cv.url}), h("span", {text: " "}), cvBadge(cv)));
+        var dl = [];
+        if (cv.contentDate) dl.push("latest entry: " + cv.contentDate);
+        if (cv.docDate) dl.push("file saved: " + cv.docDate);
+        if (cv.lastModified) dl.push("server: " + cv.lastModified);
+        if (dl.length) sec.appendChild(h("p", {class: "small muted", text: dl.join(" · ")}));
+        if (b && monthsAgo(b.d) > 18) sec.appendChild(h("p", {class: "small", style: "border-left:3px solid var(--warn);padding-left:8px", text: "Looks stale — worth asking for an update before nominations or applications."}));
+        if (cv.note) sec.appendChild(h("p", {class: "small muted", text: cv.note}));
+        if (cv.checked) sec.appendChild(h("p", {class: "small muted", text: "Found by web search on " + cv.checked + "."}));
+      } else sec.appendChild(h("p", {class: "small muted", text: "No public CV found."}));
+      sec.appendChild(h("label", {class: "f"}, "CV link", h("input", {value: cv.url || "", placeholder: "https://…", onchange: function (e) { cv.url = e.target.value.trim(); cv.manual = true; saveSoon("students", s); }})));
+      (cv.profiles || []).forEach(function (u) { sec.appendChild(h("p", {class: "small"}, h("a", {href: u, target: "_blank", rel: "noopener", text: u.length > 70 ? u.slice(0, 70) + "…" : u}))); });
+    })();
     el.appendChild(h("div", {class: "cols2"}, fld("Student email", "email", "email"), fld("Advisor email", "advisorEmail", "email")));
     var status = h("select", {onchange: function (e) { s.status = e.target.value; if (!isNew) save("students", s); }},
       [["active", "Active"], ["leave", "On leave"], ["graduated", "Graduated"]].map(function (o) { return h("option", {value: o[0], text: o[1], selected: s.status === o[0]}); }));
