@@ -435,6 +435,7 @@ function persist(coll, obj, tries) {
   });
 }
 function save(coll, obj) {
+  if (obj && !obj.branch) obj.branch = coll === "tasks" ? (obj.branch || "dir") : "dir";
   if (!obj.id) obj.id = uid();
   var list = S[coll];
   if (Array.isArray(list) && !list.some(function (x) { return x.id === obj.id; })) list.push(obj);
@@ -667,18 +668,24 @@ function sortable() {
   });
 }
 
-/* ================= LAB BRANCH =================
+/* ================= LAB BRANCH — SELF-CONTAINED =================
+   Everything between this banner and "END LAB BRANCH" is the lab half.
+   To hand the director side to someone else: delete this block, drop the
+   "lab" entry from TABSETS and the lab keys from VIEWS, and nothing breaks.
    Lab records live in the archive's history collection under kind "lab",
    so no backend change was needed. type tells them apart. */
+var LAB_KINDS = ["lab", "recipe", "cash"];
+function isLabRow(x) { return x.branch === "lab" || LAB_KINDS.indexOf(x.kind) >= 0; }
 function labRows(type) {
   if (!S.archive) return [];
-  return S.archive.history.filter(function (x) { return x.kind === "lab" && (!type || x.type === type); });
+  return S.archive.history.filter(function (x) { return isLabRow(x) && (x.kind === "lab" || (type === "cash" && x.kind === "cash")) && (!type || x.type === type); });
 }
-function recipes() { return S.archive ? S.archive.history.filter(function (x) { return x.kind === "recipe"; }).sort(function (a, b) { return (a.ord || 0) - (b.ord || 0); }) : []; }
+function recipes() { return S.archive ? S.archive.history.filter(function (x) { return x.kind === "recipe" && isLabRow(x); }).sort(function (a, b) { return (a.ord || 0) - (b.ord || 0); }) : []; }
 function labTasks() { return S.tasks.filter(function (t) { return t.branch === "lab"; }); }
 function dirTasks() { return S.tasks.filter(function (t) { return t.branch !== "lab"; }); }
 function saveLab(o) {
   o.kind = o.kind || "lab";
+  o.branch = "lab";
   if (!o.id) o.id = "lab-" + uid();
   if (S.archive) {
     var i = -1;
@@ -721,7 +728,12 @@ function vLabHome() {
     h("div", {class: "card stat", text: String(people.length)}, h("small", {text: "Lab members"})),
     h("div", {class: "card stat", text: String(grants.length)}, h("small", {text: "Active awards"})),
     h("div", {class: "card stat" + (nextIrb != null && nextIrb < 60 ? " bad" : ""), text: nextIrb == null ? "—" : nextIrb + "d"}, h("small", {text: "Next IRB renewal"})),
-    h("div", {class: "card stat", text: nextRep == null ? "—" : nextRep + "d"}, h("small", {text: "Next grant report"}))));
+    (function () {
+      var c = labRows("cash")[0];
+      if (!c) return h("div", {class: "card stat", text: nextRep == null ? "—" : nextRep + "d"}, h("small", {text: "Next grant report"}));
+      return h("div", {class: "card stat" + (c.balance <= c.threshold * 1.8 ? " bad" : ""), text: "$" + c.balance},
+        h("small", {text: "Subject cash box"}));
+    })()));
   var left = h("div", {class: "card"}, h("div", {class: "row sp"}, h("h3", {text: "On your plate", style: "margin:0"}),
     h("button", {class: "link small", text: "All chores", onclick: function () { UI.tab = "ladmin"; render(); }})));
   var items = overdue.concat(soon);
@@ -863,8 +875,31 @@ function irbDlg(p) {
 }
 
 /* ---------- admin: the chores ---------- */
+function cashCard() {
+  var c = labRows("cash")[0];
+  if (!c) return null;
+  var low = c.balance <= c.threshold, near = !low && c.balance <= c.threshold * 1.8;
+  var card = h("div", {class: "card", style: "margin-bottom:14px;border-left:3px solid var(--accent)"});
+  card.appendChild(h("div", {class: "row sp"}, h("h3", {text: "Subject payment cash box", style: "margin:0"}),
+    badge(low ? "Top it up" : near ? "Getting low" : "Fine for now", low ? "bad" : near ? "warn" : "ok")));
+  card.appendChild(h("div", {class: "row", style: "margin:10px 0 4px;align-items:baseline;gap:18px"},
+    h("div", {class: "stat", style: "font-size:32px;padding:0;background:none;border:0;box-shadow:none", text: "$" + c.balance},
+      h("small", {text: "in the box as of " + fmtDate(c.asOf)})),
+    h("div", {class: "stat", style: "font-size:22px;padding:0;background:none;border:0;box-shadow:none", text: "$" + c.burn6 + "/mo"},
+      h("small", {text: c.n6 + " subjects paid in six months"}))));
+  if (c.hitsThreshold) card.appendChild(h("p", {class: "small", text: "At that rate it reaches the $" + c.threshold + " line around " + fmtDate(c.hitsThreshold) + "."}));
+  if (c.rule) card.appendChild(h("p", {class: "small muted", text: c.rule}));
+  if ((c.payers || []).length) card.appendChild(h("p", {class: "small muted", text: "Running subjects lately: " + c.payers.join(", ") + ". Studies: " + (c.studies || []).join(", ") + "."}));
+  card.appendChild(h("div", {class: "row", style: "margin-top:10px"},
+    h("a", {class: "btn small", href: c.sheet, target: "_blank", rel: "noopener", text: "Payment sheet"}),
+    h("a", {class: "btn small", href: c.internal, target: "_blank", rel: "noopener", text: "Lab internal page"}),
+    h("button", {class: "btn", text: "Top-up shortcut", onclick: function () { var r = recipes().filter(function (x) { return x.slug === "petty-cash"; })[0]; if (r) recipeDlg(r, null); }})));
+  card.appendChild(h("p", {class: "small muted", style: "margin-top:8px", text: "Read off the payment sheet on " + fmtDate(c.fetched) + ". Ask me to refresh it when it drifts."}));
+  return card;
+}
 function vAdmin() {
   var root = h("div", {});
+  if (S.archive) { var cc = cashCard(); if (cc) root.appendChild(cc); }
   UI.taskFilter = UI.taskFilter || "open";
   var sel = h("select", {onchange: function (e) { UI.taskFilter = e.target.value; render(); }},
     [["open", "Open"], ["done", "Done"], ["all", "All"]].map(function (o) { return h("option", {value: o[0], text: o[1], selected: UI.taskFilter === o[0]}); }));
@@ -951,6 +986,8 @@ function recipeEdit(r) {
       isNew ? "" : h("button", {class: "btn", text: "Remove", onclick: function () { delLab(r); close(); }})));
   });
 }
+
+/* ================= END LAB BRANCH ================= */
 
 /* ---------- overview ---------- */
 function vHome() {
@@ -1739,6 +1776,53 @@ function vFaculty(A) {
   return root;
 }
 
+/* ---------- handoff: lift one half out cleanly ---------- */
+var HALVES = {
+  dir: {label: "Director", live: ["students", "notes", "config"], archive: ["history", "records", "alumni", "funding"]},
+  lab: {label: "Lab", live: [], archive: ["history"]}
+};
+function halfBundle(which) {
+  var spec = HALVES[which], out = {half: which, exported: todayStr(), app: "BU Dashboard", collections: {}};
+  spec.live.forEach(function (c) {
+    var v = S[c];
+    out.collections[c] = Array.isArray(v) ? v.filter(function (x) { return (x.branch || "dir") === which; }) : v;
+  });
+  out.collections.tasks = S.tasks.filter(function (t) { return (t.branch || "dir") === which; });
+  if (S.archive) spec.archive.forEach(function (c) {
+    out.collections[c] = (S.archive[c] || []).filter(function (x) { return which === "lab" ? isLabRow(x) : !isLabRow(x); });
+  });
+  out.counts = {};
+  Object.keys(out.collections).forEach(function (k) { out.counts[k] = Array.isArray(out.collections[k]) ? out.collections[k].length : 1; });
+  return out;
+}
+function downloadJson(obj, name) {
+  var a = h("a", {href: URL.createObjectURL(new Blob([JSON.stringify(obj, null, 1)], {type: "application/json"})), download: name});
+  document.body.appendChild(a); a.click(); a.remove();
+}
+function vHandoff() {
+  var root = h("div", {});
+  root.appendChild(h("p", {class: "hint", text: "The two halves are kept separable on purpose. Every stored row carries a branch tag, so either side can be lifted out whole and handed to whoever takes it over, without dragging the other side along."}));
+  if (!archiveGuard(root)) return root;
+  ["dir", "lab"].forEach(function (w) {
+    var b = halfBundle(w), card = h("div", {class: "card", style: "margin-bottom:12px"});
+    card.appendChild(h("h3", {text: HALVES[w].label + " half"}));
+    var rows = Object.keys(b.counts).filter(function (k) { return b.counts[k]; });
+    card.appendChild(h("p", {class: "small muted", text: rows.map(function (k) { return b.counts[k] + " " + k; }).join(" · ") || "nothing yet"}));
+    card.appendChild(h("button", {class: "btn" + (w === "dir" ? " primary" : ""), text: "Download the " + HALVES[w].label.toLowerCase() + " half",
+      onclick: function () { downloadJson(b, "bu-dashboard-" + w + "-" + todayStr() + ".json"); }}));
+    root.appendChild(card);
+  });
+  var how = h("div", {class: "card"}, h("h3", {text: "Handing the director side over"}));
+  [["1. Download the director half.", "One JSON file with the roster, tasks, notes, milestones, archive, handbook and faculty."],
+   ["2. Fork the repository.", "The page itself holds no data. The new director deploys their own copy."],
+   ["3. They stand up their own backend.", "A fresh Apps Script with their own key and their own sheet. Yours keeps working and they never see it."],
+   ["4. Import the JSON into their store.", "Collection by collection, exactly as exported."],
+   ["5. Delete the lab half from their copy.", "In index.html, remove the block marked LAB BRANCH and the lab entry from TABSETS. Nothing else refers to it."]
+  ].forEach(function (x) { how.appendChild(h("div", {class: "qa"}, h("div", {class: "q", text: x[0]}), h("div", {class: "a small", text: x[1]}))); });
+  root.appendChild(how);
+  return root;
+}
+
 /* ---------- where all of this came from ---------- */
 function vSources() {
   var root = h("div", {});
@@ -1786,9 +1870,10 @@ function vSources() {
 }
 
 /* ---------- tools: handbook, org chart, program reference ---------- */
-function hbSections() { return S.archive ? S.archive.history.filter(function (x) { return x.kind === "hb"; }).sort(function (a, b) { return (a.ord || 0) - (b.ord || 0); }) : []; }
+function dirRows() { return S.archive ? S.archive.history.filter(function (x) { return !isLabRow(x); }) : []; }
+function hbSections() { return S.archive ? dirRows().filter(function (x) { return x.kind === "hb"; }).sort(function (a, b) { return (a.ord || 0) - (b.ord || 0); }) : []; }
 function orgPeople() { return S.archive ? S.archive.history.filter(function (x) { return x.kind === "org"; }) : []; }
-function progFacts() { return S.archive ? S.archive.history.filter(function (x) { return x.kind === "prog"; }) : []; }
+function progFacts() { return dirRows().filter(function (x) { return x.kind === "prog"; }); }
 function hlight(txt, q, tag) {
   var box = h(tag || "pre", {});
   if (!q) { box.textContent = txt; return box; }
@@ -1805,9 +1890,10 @@ function hlight(txt, q, tag) {
 function vTools() {
   var root = h("div", {});
   UI.tv = UI.tv || "handbook";
-  root.appendChild(subtabs("Tools", [["handbook", "Student handbook"], ["program", "Program reference"], ["links", "Links"], ["sources", "Source data"], ["settings", "Settings"]], UI.tv, function (v) { UI.tv = v; UI.hv = "tv" + v; render(); }));
+  root.appendChild(subtabs("Tools", [["handbook", "Student handbook"], ["program", "Program reference"], ["links", "Links"], ["sources", "Source data"], ["handoff", "Handoff"], ["settings", "Settings"]], UI.tv, function (v) { UI.tv = v; UI.hv = "tv" + v; render(); }));
   if (UI.tv === "settings") { root.appendChild(vSettings()); return root; }
   if (UI.tv === "links") { root.appendChild(vLinks()); return root; }
+  if (UI.tv === "handoff") { root.appendChild(vHandoff()); return root; }
   if (!archiveGuard(root)) return root;
   root.appendChild(UI.tv === "sources" ? vSources() : UI.tv === "program" ? vProgRef() : vHandbook());
   return root;
@@ -1988,7 +2074,7 @@ function vProgram() {
   return root;
 }
 function histOutcomes(A) {
-  var cyc = A.history.filter(function (c) { return c.cycle; }).sort(function (a, b) { return a.cycle.localeCompare(b.cycle); }), wrap = h("div", {});
+  var cyc = A.history.filter(function (c) { return c.cycle && !isLabRow(c); }).sort(function (a, b) { return a.cycle.localeCompare(b.cycle); }), wrap = h("div", {});
   var live = null;
   if (S.reviews) { var rows = revData(); if (rows.some(function (r) { return r.aSub; })) live = [1, 2, 3, 4].map(function (n) { return goalStats(rows, n); }); }
   var th = h("tr", {}, h("th", {text: "Goal"}));

@@ -1,6 +1,8 @@
-# DirectorDashboard
+# BU Dashboard
 
-Private dashboard for the BBC PhD program director (Dept. of Psychological & Brain Sciences, Boston University): tasks, per-student milestones, notes, funding by year, the live annual-report cycle, and the program archive.
+Private dashboard for one person wearing two hats at Boston University: PI of the Ling Lab, and director of the BBC PhD program (Dept. of Psychological & Brain Sciences).
+
+It has two halves, switched at the top of the page: **Lab** and **Director**. They are deliberately kept separable — see "Separating the two halves" below.
 
 ## How it is put together
 
@@ -10,7 +12,7 @@ Private dashboard for the BBC PhD program director (Dept. of Psychological & Bra
 
 ## Tabs
 
-Ordered roughly by how often they get used.
+### Director
 
 | Tab | What it holds |
 | --- | --- |
@@ -22,7 +24,29 @@ Ordered roughly by how often they get used.
 | **Funding** | One subtab per year, newest first, plus an all-years comparison |
 | **People** | Everyone the program has a record of, current and former, with their reports, funding and milestones in one place |
 | **Program** | Learning outcomes by cycle, earlier cohorts, and program documents |
-| **Settings** | Milestone template, JSON backup, sign out |
+| **Tools** | Searchable student handbook, program reference, links, source data, handoff, settings |
+
+### Lab
+
+| Tab | What it holds |
+| --- | --- |
+| **Overview** | Overdue chores, what is due soon, IRB and grant dates, the cash box |
+| **Lab** | Members and their roles, funding and projects |
+| **Grants** | Awards, periods, next report due |
+| **Compliance** | IRB protocols, status, expiry |
+| **Admin** | Lab chores, plus the subject payment cash box |
+| **Shortcuts** | Editable recipes for the recurring nonsense, each with steps, links and a prompt to hand to Claude |
+
+## Separating the two halves
+
+The point is that the director half can be handed to the next program director without dragging the lab half along, and vice versa.
+
+- **Every stored row carries a `branch` tag** — `"dir"` or `"lab"`. Nothing is shared between them; a check of the two exports finds zero overlapping ids.
+- **Tools → Handoff** exports either half as a single JSON file, with per-collection counts shown before you download.
+- **The lab code is one block** in `index.html`, between the banners `LAB BRANCH — SELF-CONTAINED` and `END LAB BRANCH`. Delete that block, drop the `lab` entry from `TABSETS` and the lab keys from `VIEWS`, and the director half runs untouched.
+- **Each half keeps its own tab order** under its own localStorage key, so neither inherits the other's layout.
+
+To hand the director side over: download the director half, fork the repo, have the new director stand up their own Apps Script with their own key and sheet, import the JSON collection by collection, and delete the lab block. Your copy keeps working and they never see your lab data.
 
 ## Storage
 
@@ -30,6 +54,7 @@ The Apps Script keeps one "Store" sheet with the columns Collection, Id, Updated
 
 - Live collections, loaded on every visit: `students`, `tasks`, `notes`, `config`
 - Archive collections, loaded only when an archive view is opened: `history`, `records`, `alumni`, `funding`
+- Lab rows live in `history` under `kind` of `lab`, `recipe` or `cash`, all tagged `branch: "lab"`
 
 Backend actions: `load`, `put`, `del`, `bulk`, `report`, `reviews`, `archive`.
 
