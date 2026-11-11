@@ -1,0 +1,249 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>BBC Offer Authorization</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,650&family=Inter:wght@400;500;650&display=swap" rel="stylesheet">
+<style>
+:root{
+ --bg:#f7f4ef;--panel:#fffdfa;--panel2:#faf6f0;
+ --ink:#1f1d1a;--ink2:#3c3832;--muted:#73695d;--line:#e4dcd0;--line2:#d6cabb;
+ --accent:#a3231b;--accent2:#c7673b;--accent-soft:#f7e9e5;
+ --ok:#2d6a4a;--ok-bg:#e2f0e6;--warn:#8a6210;--warn-bg:#fbefd4;
+ --shadow:0 1px 2px rgba(60,45,30,.07),0 4px 14px -6px rgba(60,45,30,.10);
+ --r:14px;
+ --display:"Fraunces",ui-serif,Georgia,serif;
+ --sans:"Inter",ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+ --bg:#171614;--panel:#201e1b;--panel2:#262320;--ink:#f2ede5;--ink2:#ded6ca;--muted:#9d9387;
+ --line:#332f2a;--line2:#443e37;--accent:#e2766a;--accent2:#d98f63;--accent-soft:#33241f;
+ --ok:#8fd6ad;--ok-bg:#1d3329;--warn:#e8c278;--warn-bg:#352a15;
+}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.6 var(--sans);
+ -webkit-font-smoothing:antialiased;padding:0 16px}
+.wrap{max-width:760px;margin:0 auto;padding:32px 0 72px}
+h1{font-family:var(--display);font-weight:650;font-size:clamp(26px,4.6vw,34px);line-height:1.15;margin:0 0 6px;letter-spacing:-.015em}
+.sub{color:var(--muted);margin:0 0 4px}
+.due{display:inline-block;margin:14px 0 0;padding:7px 14px;border-radius:999px;background:var(--warn-bg);color:var(--warn);font-weight:650;font-size:14px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:22px;margin:22px 0;box-shadow:var(--shadow)}
+h2{font-family:var(--display);font-weight:650;font-size:19px;margin:0 0 4px;letter-spacing:-.01em}
+h2 .n{color:var(--accent);margin-right:8px}
+.hint{color:var(--muted);font-size:14.5px;margin:0 0 16px}
+label{display:block;font-weight:650;font-size:14px;margin:16px 0 6px}
+label:first-of-type{margin-top:0}
+input,select,textarea{width:100%;font:15px/1.5 var(--sans);color:var(--ink);background:var(--panel2);
+ border:1px solid var(--line2);border-radius:9px;padding:10px 12px}
+textarea{min-height:84px;resize:vertical}
+input:focus,select:focus,textarea:focus{outline:2px solid var(--accent);outline-offset:1px;border-color:transparent}
+.row{display:flex;gap:14px;flex-wrap:wrap}
+.row>div{flex:1 1 170px}
+.seg{display:flex;gap:8px;flex-wrap:wrap}
+.seg button{font:650 14px var(--sans);padding:9px 16px;border-radius:999px;border:1px solid var(--line2);
+ background:var(--panel2);color:var(--ink2);cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:#fff}
+.mine{background:var(--accent-soft);border:1px solid var(--line);border-radius:10px;padding:13px 15px;margin:14px 0 0;font-size:14.5px}
+.mine b{font-weight:650}
+.mine ul{margin:8px 0 0;padding-left:19px}
+.mine li{margin:3px 0}
+.mine .tag{font-size:12px;color:var(--muted)}
+.btn{font:650 16px var(--sans);padding:13px 26px;border-radius:999px;border:1px solid var(--accent);
+ background:var(--accent);color:#fff;cursor:pointer}
+.btn:disabled{opacity:.5;cursor:default}
+.msg{margin-top:14px;font-size:14.5px;min-height:22px}
+.msg.bad{color:var(--accent)}
+.msg.good{color:var(--ok)}
+.done{text-align:center;padding:44px 22px}
+.done .big{font-family:var(--display);font-size:26px;font-weight:650;margin-bottom:8px}
+.foot{color:var(--muted);font-size:13px;text-align:center;margin-top:26px}
+.hidden{display:none}
+@media (prefers-reduced-motion:no-preference){.card{transition:box-shadow .2s}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>BBC Offer Authorization</h1>
+  <p class="sub">Two things GRS needs from each of us for students entering <b>Fall 2027</b>.</p>
+  <p class="sub">It takes about two minutes. Partial answers are more useful than none.</p>
+  <div class="due" id="due">Due Thursday at noon</div>
+
+  <form id="f">
+    <div class="card">
+      <label for="who">Who are you?</label>
+      <select id="who" required>
+        <option value="">Select your name…</option>
+      </select>
+      <div class="mine hidden" id="mine"></div>
+    </div>
+
+    <div class="card">
+      <h2><span class="n">1</span>Will you take a student entering Fall 2027?</h2>
+      <p class="hint">If yes, GRS wants the funding already identified — not funding you hope to have.</p>
+      <div class="seg" role="group" aria-label="Taking a student">
+        <button type="button" data-v="yes" aria-pressed="false">Yes</button>
+        <button type="button" data-v="maybe" aria-pressed="false">Maybe</button>
+        <button type="button" data-v="no" aria-pressed="false">No</button>
+      </div>
+      <div id="ifyes" class="hidden">
+        <div class="row">
+          <div>
+            <label for="howmany">How many students?</label>
+            <input id="howmany" type="number" min="1" max="5" step="1" placeholder="1">
+          </div>
+          <div>
+            <label for="enddate">Funding end date</label>
+            <input id="enddate" type="text" placeholder="e.g. 8/31/2029">
+          </div>
+        </div>
+        <label for="sources">Identified funding source(s)</label>
+        <input id="sources" type="text" placeholder="e.g. R01 EY0XXXXX; start-up; NSF co-PI">
+      </div>
+    </div>
+
+    <div class="card">
+      <h2><span class="n">2</span>TF needs for your continuing students</h2>
+      <p class="hint">How many TF positions will your <b>current</b> students need, assuming conservatively that
+        no new grant funding arrives in the next year. This is not a commitment to use the slots — it's how the
+        program justifies having them, so a low number here costs us slots later.</p>
+      <div class="row">
+        <div>
+          <label for="tff">Fall 2027 — TF positions</label>
+          <input id="tff" type="number" min="0" max="10" step="1" placeholder="0">
+        </div>
+        <div>
+          <label for="tfs">Spring 2028 — TF positions</label>
+          <input id="tfs" type="number" min="0" max="10" step="1" placeholder="0">
+        </div>
+      </div>
+      <label for="notes">Anything else I should know</label>
+      <textarea id="notes" placeholder="e.g. a student expected to defend before Fall 2027, a pending grant, a correction to the list above"></textarea>
+    </div>
+
+    <div class="card" style="text-align:center">
+      <button class="btn" id="go" type="submit">Submit</button>
+      <div class="msg" id="msg" role="status" aria-live="polite"></div>
+    </div>
+  </form>
+
+  <div class="card done hidden" id="thanks">
+    <div class="big">Thank you</div>
+    <p class="sub" id="thanksWho"></p>
+    <p class="sub">Recorded. If you need to change anything, just submit the form again — the latest answer wins.</p>
+  </div>
+
+  <p class="foot">BBC PhD Program · questions to Sam Ling</p>
+</div>
+
+<script>
+var ENDPOINT = "https://script.google.com/macros/s/AKfycbzEvyhVxuqA9G0w4c9gyUHHB9JDqtDa3fqZFyhNc6G5taf9oS3BWKQzsQPXj0qCFhIN/exec";
+var TOKEN = "4hhpu5wwnz3m7m3l";
+
+/* Faculty and their current BBC students, so people can answer Q2 without
+   going to look it up. Student names only; nothing sensitive here. */
+var ROSTER = [{"name":"Leah Bakst","n":0},{"name":"Catherine Caldwell-Harris","n":1},{"name":"Chandramouli Chandrasekaran","n":0},{"name":"James Cherry","n":0},{"name":"Alice Cronin-Golomb","n":0},{"name":"Rachel Denison","n":3},{"name":"Brett DiBenedictis","n":0},{"name":"Michael Hasselmo","n":1},{"name":"Marc Howard","n":1},{"name":"Mark Howe","n":1},{"name":"Melissa Kibbe","n":0},{"name":"Arthur Lee","n":1},{"name":"Sam Ling","n":3},{"name":"Joseph McGuire","n":1},{"name":"Heidi Meyer","n":2},{"name":"Kate Nussenbaum","n":2},{"name":"Irene Pepperberg","n":0},{"name":"Yakeel Quiroz","n":0},{"name":"Steve Ramirez","n":0},{"name":"Robert Reinhart","n":2},{"name":"Benjamin Scott","n":1},{"name":"David Somers","n":1},{"name":"Chantal Stern","n":0},{"name":"Arash Yazdanbakhsh","n":0}];
+
+var $ = function (id) { return document.getElementById(id); };
+var taking = "";
+
+(function init() {
+  var sel = $("who");
+  ROSTER.forEach(function (r) {
+    var o = document.createElement("option");
+    o.value = r.name; o.textContent = r.name;
+    sel.appendChild(o);
+  });
+  var o = document.createElement("option");
+  o.value = "__other"; o.textContent = "Someone else (type below)";
+  sel.appendChild(o);
+
+  /* deep link: offers.html#Kate%20Nussenbaum pre-selects */
+  var h = decodeURIComponent(location.hash.slice(1));
+  if (h) { sel.value = h; }
+  sel.addEventListener("change", showMine);
+  showMine();
+
+  Array.prototype.forEach.call(document.querySelectorAll(".seg button"), function (b) {
+    b.addEventListener("click", function () {
+      taking = b.dataset.v;
+      Array.prototype.forEach.call(document.querySelectorAll(".seg button"), function (x) {
+        x.setAttribute("aria-pressed", String(x === b));
+      });
+      $("ifyes").classList.toggle("hidden", taking === "no" || !taking);
+    });
+  });
+})();
+
+function showMine() {
+  var v = $("who").value, box = $("mine");
+  if (v === "__other") {
+    box.classList.remove("hidden");
+    box.innerHTML = '<label for="othername" style="margin-top:0">Your name</label>' +
+      '<input id="othername" type="text" placeholder="First Last">';
+    return;
+  }
+  var r = null;
+  ROSTER.forEach(function (x) { if (x.name === v) r = x; });
+  if (!r) { box.classList.add("hidden"); box.textContent = ""; return; }
+  box.classList.remove("hidden");
+  if (!r.n) {
+    box.innerHTML = "<b>No current BBC students on record for you.</b> " +
+      "If that's wrong, say so in the notes below and leave question 2 blank.";
+    return;
+  }
+  box.innerHTML = "<b>I have " + r.n + " current BBC student" + (r.n > 1 ? "s" : "") +
+    " on record for you</b> \u2014 that's the pool question 2 is about. " +
+    "If that count is wrong, say so in the notes and I'll fix it.";
+}
+function esc(s) {
+  return String(s == null ? "" : s).replace(/[&<>"]/g, function (c) {
+    return {"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;"}[c];
+  });
+}
+
+$("f").addEventListener("submit", function (ev) {
+  ev.preventDefault();
+  var who = $("who").value;
+  if (who === "__other") who = ($("othername") || {}).value || "";
+  who = String(who).trim();
+  var msg = $("msg");
+  if (!who) { msg.className = "msg bad"; msg.textContent = "Please choose or type your name."; return; }
+  if (!taking) { msg.className = "msg bad"; msg.textContent = "Please answer question 1."; return; }
+
+  $("go").disabled = true;
+  msg.className = "msg"; msg.textContent = "Sending…";
+
+  var body = {
+    action: "offer", token: TOKEN,
+    faculty: who,
+    taking: taking,
+    howMany: taking === "no" ? "" : $("howmany").value,
+    sources: taking === "no" ? "" : $("sources").value,
+    endDate: taking === "no" ? "" : $("enddate").value,
+    tfFall: $("tff").value,
+    tfSpring: $("tfs").value,
+    notes: $("notes").value
+  };
+  fetch(ENDPOINT, {
+    method: "POST",
+    headers: {"Content-Type": "text/plain;charset=utf-8"},
+    body: JSON.stringify(body)
+  }).then(function (r) { return r.json(); }).then(function (r) {
+    if (!r || !r.ok) throw new Error((r && r.error) || "failed");
+    $("f").classList.add("hidden");
+    $("due").classList.add("hidden");
+    $("thanksWho").textContent = who;
+    $("thanks").classList.remove("hidden");
+    window.scrollTo({top: 0, behavior: "smooth"});
+  }).catch(function () {
+    $("go").disabled = false;
+    msg.className = "msg bad";
+    msg.textContent = "That didn't go through. Try once more, and if it still fails just email me the answers.";
+  });
+});
+</script>
+</body>
+</html>

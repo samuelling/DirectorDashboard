@@ -2382,11 +2382,96 @@ function vPeople() {
 /* ---------- program: how the program itself has done over time ---------- */
 function vProgram() {
   var root = h("div", {});
-  root.appendChild(h("p", {class: "hint", text: "How the program has done against its learning outcomes, cycle by cycle."}));
+  UI.pv = UI.pv || "outcomes";
+  root.appendChild(subtabs("Program", [["outcomes", "Learning outcomes"], ["offers", "Offer authorization"]],
+    UI.pv, function (v) { UI.pv = v; UI.hv = "pv" + v; render(); }));
   if (!archiveGuard(root)) return root;
+  if (UI.pv === "offers") { root.appendChild(vOffers()); return root; }
+  root.appendChild(h("p", {class: "hint", text: "How the program has done against its learning outcomes, cycle by cycle."}));
   if (!S.reviews && !revState.loading && !revState.error) loadReviews();
   root.appendChild(histOutcomes(S.archive));
   return root;
+}
+
+/* ---------- offer authorization: what faculty sent back through offers.html ---------- */
+function offerRows() {
+  return S.archive ? S.archive.offers || [] : [];
+}
+function lastName(n) { var p = String(n || "").trim().split(/\s+/); return (p[p.length - 1] || "").toLowerCase(); }
+function num(v) { var n = parseInt(v, 10); return isNaN(n) ? 0 : n; }
+function vOffers() {
+  var root = h("div", {});
+  var rows = offerRows();
+  var fac = (S.archive.history || []).filter(function (x) { return x.kind === "fac"; });
+  var replied = {}; rows.forEach(function (r) { replied[lastName(r.faculty)] = true; });
+  var waiting = fac.filter(function (f) { return !replied[lastName(f.name)]; })
+                   .map(function (f) { return f.name; }).sort();
+
+  var yes = rows.filter(function (r) { return r.taking === "yes"; });
+  var maybe = rows.filter(function (r) { return r.taking === "maybe"; });
+  var slots = yes.reduce(function (a, r) { return a + (num(r.howMany) || 1); }, 0);
+  var tff = rows.reduce(function (a, r) { return a + num(r.tfFall); }, 0);
+  var tfs = rows.reduce(function (a, r) { return a + num(r.tfSpring); }, 0);
+
+  root.appendChild(h("p", {class: "hint"},
+    "Responses to the Fall 2027 offer-authorization form. ",
+    h("a", {href: "offers.html", target: "_blank", rel: "noopener", text: "Open the form"}),
+    " \u00b7 resubmitting overwrites a person's previous answer."));
+
+  root.appendChild(h("div", {class: "grid g2", style: "margin-bottom:12px"},
+    h("div", {class: "card"}, h("h3", {text: "Admissions"}), h("div", {class: "row"},
+      h("div", {class: "stat", style: "margin-right:18px", text: String(rows.length)}, h("small", {text: "replied of " + fac.length})),
+      h("div", {class: "stat", style: "margin-right:18px", text: String(slots)}, h("small", {text: "students wanted"})),
+      h("div", {class: "stat", text: String(maybe.length)}, h("small", {text: "undecided"})))),
+    h("div", {class: "card"}, h("h3", {text: "TF positions for continuing students"}), h("div", {class: "row"},
+      h("div", {class: "stat", style: "margin-right:18px", text: String(tff)}, h("small", {text: "Fall 2027"})),
+      h("div", {class: "stat", text: String(tfs)}, h("small", {text: "Spring 2028"}))))));
+
+  if (!rows.length) {
+    root.appendChild(h("div", {class: "card empty", text: "Nothing in yet. Replies land here as faculty submit the form."}));
+  } else {
+    var tb = h("tbody", {});
+    rows.slice().sort(function (a, b) { return String(a.faculty).localeCompare(String(b.faculty)); }).forEach(function (r) {
+      var cls = r.taking === "yes" ? "b-ok" : r.taking === "maybe" ? "b-warn" : "b-idle";
+      tb.appendChild(h("tr", {},
+        h("td", {}, h("button", {class: "link", text: r.faculty, onclick: function () { offerDlg(r); }})),
+        h("td", {}, h("span", {class: "badge " + cls, text: (r.taking || "\u2014").replace(/^./, function (c) { return c.toUpperCase(); })})),
+        h("td", {class: "small", text: r.taking === "yes" ? (r.howMany || "1") : "\u2014"}),
+        h("td", {class: "small", text: r.sources || "\u2014"}),
+        h("td", {class: "small", text: r.endDate || "\u2014"}),
+        h("td", {class: "small", text: r.tfFall || "0"}),
+        h("td", {class: "small", text: r.tfSpring || "0"}),
+        h("td", {class: "small muted", text: fmtDate((r.at || "").slice(0, 10))})));
+    });
+    root.appendChild(h("div", {class: "tw"}, h("table", {}, h("thead", {}, h("tr", {},
+      ["Faculty", "Taking?", "How many", "Funding identified", "Funding ends", "TF fall", "TF spring", "Replied"]
+        .map(function (x) { return h("th", {text: x}); }))), tb)));
+  }
+
+  if (waiting.length) {
+    root.appendChild(h("div", {class: "card"},
+      h("h3", {text: "Not heard from yet (" + waiting.length + ")"}),
+      h("p", {class: "small muted", text: waiting.join(" \u00b7 ")})));
+  }
+  return root;
+}
+function offerDlg(r) {
+  dialog(function (el, close) {
+    el.appendChild(h("div", {class: "row sp"}, h("h2", {text: r.faculty}),
+      h("button", {class: "btn", text: "Close", onclick: close})));
+    function line(k, v) {
+      if (!isFilled(v)) return;
+      el.appendChild(h("p", {style: "margin:0 0 8px"}, h("b", {text: k + ": "}), h("span", {text: String(v)})));
+    }
+    line("Taking a student", r.taking);
+    line("How many", r.howMany);
+    line("Funding identified", r.sources);
+    line("Funding ends", r.endDate);
+    line("TF needed, Fall 2027", r.tfFall);
+    line("TF needed, Spring 2028", r.tfSpring);
+    line("Notes", r.notes);
+    line("Submitted", r.at);
+  });
 }
 function histOutcomes(A) {
   var cyc = A.history.filter(function (c) { return c.cycle && !isLabRow(c); }).sort(function (a, b) { return a.cycle.localeCompare(b.cycle); }), wrap = h("div", {});
